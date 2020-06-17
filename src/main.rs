@@ -1,6 +1,9 @@
 use directories::ProjectDirs;
 
-fn main() {
+use std::fs::{self, File};
+use std::io::Error;
+
+fn main() -> Result<(), Error> {
     println!("Hello, world!");
     // step 1
     // check if redshift mode or xrandr mode
@@ -15,5 +18,10 @@ fn main() {
     // cache the mode
     let cache_directory = project_directory.cache_dir();
 
+    if !cache_directory.exists() {
+        fs::create_dir_all(cache_directory)?;
+    }
+
     println!("{}", cache_directory.to_str().unwrap());
+    Ok(())
 }
