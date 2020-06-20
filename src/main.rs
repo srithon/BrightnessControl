@@ -3,6 +3,7 @@ use directories::ProjectDirs;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Error, ErrorKind, Seek, Write, Read, Result};
 use std::fmt::Display;
+use std::process::Command;
 
 use std::cmp;
 
@@ -148,7 +149,25 @@ fn main() -> Result<()> {
         }, 100)?
     };
 
-    println!("Brightness is {}", brightness);
+    let brightness_string = format!("{:.2}", brightness as f32 / 100.0);
+    println!("Brightness is {}", brightness_string);
+
+    let mut xrandr_call = {
+        let mut xrandr_call = Command::new("xrandr");
+        xrandr_call.arg("--output")
+                  .arg("eDP-1")
+                  .arg("--brightness")
+                  .arg(brightness_string);
+
+        if mode == 1 {
+            xrandr_call.arg("--gamma")
+                      .arg("1.1:0.8:0.7");
+        }
+
+        xrandr_call
+    };
+
+    xrandr_call.spawn()?;
 
     Ok(())
 }
