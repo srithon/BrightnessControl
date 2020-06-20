@@ -49,7 +49,11 @@ fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&
             }
         };
 
-        write!(file, "{}", new_value)?;
+        let formatted_new_value = format!("{}", new_value);
+        // <<NOTE>> this can overflow? len() returns a usize
+        file.set_len(formatted_new_value.len() as u64)?;
+
+        write!(file, "{}", formatted_new_value)?;
         Ok(new_value)
     }
 }
