@@ -30,7 +30,6 @@ fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&
                 String::from_utf8_unchecked(buffer)
             };
 
-            println!("Read in string: {}", string);
 
             data_validator(&string)
         })()
@@ -84,7 +83,6 @@ fn main() -> Result<()> {
     let project_directory = get_project_directory()?;
     let cache_directory = project_directory.cache_dir();
 
-    println!("{}", cache_directory.to_str().unwrap());
 
     let mut args = std::env::args();
 
@@ -93,7 +91,6 @@ fn main() -> Result<()> {
 
     let increment = arg_unwrapped.parse::<i16>().unwrap_or(0);
 
-    println!("increment: {}", increment);
 
     let mode_filepath = cache_directory.join("mode");
     let brightness_filepath = cache_directory.join("brightness");
@@ -141,7 +138,6 @@ fn main() -> Result<()> {
             get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
                 if let Ok(num) = data_in_file.parse::<u8>() {
                     if num == 0 || num == 1 {
-                        println!("Successfully read in num: {}", num);
                         return Ok(Valid(num));
                     }
                 }
@@ -153,7 +149,6 @@ fn main() -> Result<()> {
     };
 
 
-    println!("Mode is {}", mode);
 
     let brightness = {
         let mut brightness_file = file_open_options.open(brightness_filepath)?;
@@ -162,7 +157,6 @@ fn main() -> Result<()> {
         get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
             // need to trim this because the newline character breaks the parse
             if let Ok(num) = data_in_file.trim_end().parse::<i16>() {
-                println!("Brightness - Successfully read in num: {}", num);
 
                 if num >= 0 {
                     // ensure range of [0, 100]
@@ -183,7 +177,7 @@ fn main() -> Result<()> {
     };
 
     let brightness_string = format!("{:.2}", brightness as f32 / 100.0);
-    println!("Brightness is {}", brightness_string);
+    println!("Brightness: {}", brightness_string);
 
     let mut xrandr_call = {
         let mut xrandr_call = Command::new("xrandr");
