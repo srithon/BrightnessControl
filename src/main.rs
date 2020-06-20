@@ -59,6 +59,7 @@ fn main() -> Result<()> {
     println!("{}", cache_directory.to_str().unwrap());
 
     let mode_filepath = cache_directory.join("mode");
+    let brightness_filepath = cache_directory.join("brightness");
 
     let mut file_open_options = OpenOptions::new();
     file_open_options.read(true);
@@ -88,6 +89,25 @@ fn main() -> Result<()> {
 
 
     println!("Mode is {}", mode);
+
+    let brightness = {
+        let mut brightness_file = file_open_options.open(brightness_filepath)?;
+        // brightness_file.set_len(3)?;
+
+        get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
+            // need to trim this because the newline character breaks the parse
+            if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
+                println!("Brightness - Successfully read in num: {}", num);
+                if num <= 100 {
+                    return Ok(num);
+                }
+            }
+
+            return Err(Error::new(ErrorKind::InvalidData, "Brightness out of bounds"));
+        }, 100)?
+    };
+
+    println!("Brightness is {}", brightness);
 
     Ok(())
 }
