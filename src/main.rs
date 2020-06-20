@@ -1,9 +1,43 @@
 use directories::ProjectDirs;
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{Error, ErrorKind, Seek, Write, Read};
+use std::io::{Error, ErrorKind, Seek, Write, Read, Result};
+use std::fmt::Display;
 
-fn main() -> Result<(), Error> {
+// where ....
+fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
+    where T: Display {
+    let file_contents = {
+        // wrapping in a closure allows the inner else and the
+        // outer else clauses to share the same code
+        // here, we want to return None if the file does not exist
+        // or if the file's contents are not readable as a number
+        (|| -> std::io::Result<T> {
+            let mut buffer: Vec<u8> = Vec::new();
+            file.read_to_end(&mut buffer)?;
+
+            let string = unsafe {
+                String::from_utf8_unchecked(buffer)
+            };
+
+            println!("Read in string: {}", string);
+
+            data_validator(&string)
+        })()
+    };
+
+    match file_contents {
+        Ok(contents) => Ok(contents),
+        Err(_) => {
+            // default to "regular" mode
+            file.seek(std::io::SeekFrom::Start(0))?;
+            write!(file, "{}", &default_value)?;
+            Ok(default_value)
+        },
+    }
+}
+
+fn main() -> Result<()> {
     println!("Hello, world!");
     // step 1
     // check if redshift mode or xrandr mode
@@ -37,44 +71,21 @@ fn main() -> Result<(), Error> {
         let mode_exists = mode_filepath.exists();
         println!("Mode exists? {}", mode_exists);
         let mut mode_file = file_open_options.open(mode_filepath)?;
+        mode_file.set_len(1)?;
 
-        let file_contents = {
-            // wrapping in a closure allows the inner else and the
-            // outer else clauses to share the same code
-            // here, we want to return None if the file does not exist
-            // or if the file's contents are not readable as a number
-            (|| -> std::io::Result<u8> {
-                if mode_exists {
-                    let mut mode_buffer: [u8; 1] = [0; 1];
-                    mode_file.read_exact(&mut mode_buffer)?;
-
-                    let mode_string = unsafe {
-                        String::from_utf8_unchecked(mode_buffer.to_vec())
-                    };
-
-                    println!("Read in string: {}", mode_string);
-                    if let Ok(num) = mode_string.parse::<u8>() {
-                        if num == 0 || num == 1 {
-                            println!("Successfully read in num: {}", num);
-                            return Ok(num);
-                        }
-                    }
+        get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
+            if let Ok(num) = data_in_file.parse::<u8>() {
+                if num == 0 || num == 1 {
+                    println!("Successfully read in num: {}", num);
+                    return Ok(num);
                 }
+            }
 
-                return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
-            })()
-        };
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
 
-        match file_contents {
-            Ok(mode) => mode,
-            Err(_) => {
-                // default to "regular" mode
-                mode_file.seek(std::io::SeekFrom::Start(0))?;
-                write!(mode_file, "0")?;
-                0 as u8
-            },
-        }
+        }, 0)?
     };
+
 
     println!("Mode is {}", mode);
 
