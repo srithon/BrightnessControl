@@ -1,7 +1,7 @@
 use directories::ProjectDirs;
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{Error, ErrorKind, Seek, Write, Read, Result};
+use std::io::{Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
 use std::fmt::Display;
 use std::process::Command;
 
@@ -79,7 +79,6 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
 }
 
 fn main() -> Result<()> {
-    println!("Hello, world!");
     // step 1
     // check if redshift mode or xrandr mode
     let project_directory = get_project_directory()?;
@@ -89,13 +88,10 @@ fn main() -> Result<()> {
 
     let mut args = std::env::args();
 
-    let increment = {
-        let arg = args.nth(1);
-        match arg {
-            Some(num) => num.parse::<i16>().unwrap_or(0),
-            None => 0,
-        }
-    };
+    let arg = args.nth(1);
+    let arg_unwrapped = arg.unwrap_or("".to_string());
+
+    let increment = arg_unwrapped.parse::<i16>().unwrap_or(0);
 
     println!("increment: {}", increment);
 
@@ -113,17 +109,47 @@ fn main() -> Result<()> {
         let mut mode_file = file_open_options.open(mode_filepath)?;
         mode_file.set_len(1)?;
 
-        get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
-            if let Ok(num) = data_in_file.parse::<u8>() {
-                if num == 0 || num == 1 {
-                    println!("Successfully read in num: {}", num);
-                    return Ok(Valid(num));
-                }
+        let toggled_mode: Option<u8> = {
+            if increment == 0 && arg_unwrapped.eq("--toggle") {
+                Some((|| -> Result<u8> {
+                    // toggle code
+                    let mut char_buffer: [u8; 1] = [0; 1];
+
+                    mode_file.read_exact(&mut char_buffer)?;
+
+                    let new_mode = {
+                        match char_buffer[0] as char {
+                            '0' => 1,
+                            _   => 0
+                        }
+                    };
+
+                    mode_file.seek(SeekFrom::Start(0))?;
+                    write!(mode_file, "{}", new_mode)?;
+                    return Ok(new_mode);
+                })()?)
             }
+            else {
+                None
+            }
+        };
 
-            return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
+        if let Some(mode) = toggled_mode {
+            mode
+        }
+        else {
+            get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
+                if let Ok(num) = data_in_file.parse::<u8>() {
+                    if num == 0 || num == 1 {
+                        println!("Successfully read in num: {}", num);
+                        return Ok(Valid(num));
+                    }
+                }
 
-        }, 0)?
+                return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
+
+            }, 0)?
+        }
     };
 
 
