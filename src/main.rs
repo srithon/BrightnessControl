@@ -69,8 +69,6 @@ fn main() -> Result<()> {
     // 0 for regular
     // 1 for night light
     let mode = {
-        let mode_exists = mode_filepath.exists();
-        println!("Mode exists? {}", mode_exists);
         let mut mode_file = file_open_options.open(mode_filepath)?;
         mode_file.set_len(1)?;
 
