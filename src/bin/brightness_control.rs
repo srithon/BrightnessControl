@@ -102,53 +102,67 @@ fn main() -> Result<()> {
 
     // 0 for regular
     // 1 for night light
-    let mode = {
-        let mut mode_file = file_open_options.open(mode_filepath)?;
-        mode_file.set_len(1)?;
+    let mut mode_file = file_open_options.open(mode_filepath)?;
+    mode_file.set_len(1)?;
 
-        let toggled_mode: Option<u8> = {
-            if increment == 0 && arg_unwrapped.eq("--toggle") {
-                Some((|| -> Result<u8> {
-                    // toggle code
-                    let mut char_buffer: [u8; 1] = [0; 1];
+    let toggled_mode: Option<u8> = {
+        if increment == 0 && arg_unwrapped.eq("--toggle") {
+            Some((|| -> Result<u8> {
+                // toggle code
+                let mut char_buffer: [u8; 1] = [0; 1];
 
-                    mode_file.read_exact(&mut char_buffer)?;
+                mode_file.read_exact(&mut char_buffer)?;
 
-                    let new_mode = {
-                        match char_buffer[0] as char {
-                            '0' => 1,
-                            _   => 0
-                        }
-                    };
+                let new_mode = {
+                    match char_buffer[0] as char {
+                        '0' => 1,
+                        _   => 0
+                    }
+                };
 
-                    mode_file.seek(SeekFrom::Start(0))?;
-                    write!(mode_file, "{}", new_mode)?;
-                    return Ok(new_mode);
-                })()?)
-            }
-            else {
-                None
-            }
-        };
-
-        if let Some(mode) = toggled_mode {
-            mode
+                mode_file.seek(SeekFrom::Start(0))?;
+                write!(mode_file, "{}", new_mode)?;
+                return Ok(new_mode);
+            })()?)
         }
         else {
-            get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
-                if let Ok(num) = data_in_file.parse::<u8>() {
-                    if num == 0 || num == 1 {
-                        return Ok(Valid(num));
-                    }
-                }
-
-                return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
-
-            }, 0)?
+            None
         }
     };
 
+    if let Some(mode) = toggled_mode {
+        match mode {
+            0 => {
+                // turn off redshift
+                let mut redshift_disable = Command::new("redshift");
+                redshift_disable.arg("-x");
+                redshift_disable.spawn()?;
+            },
+            1 => {
+                // turn on redshift
+                let mut redshift_enable = Command::new("redshift");
+                redshift_enable.arg("-r");
+                redshift_enable.arg("-o");
+                redshift_enable.arg("4700");
+                redshift_enable.spawn()?;
+            },
+            _ => panic!("Mode is {}!?", mode)
+        };
 
+        mode
+    }
+    else {
+        get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
+            if let Ok(num) = data_in_file.parse::<u8>() {
+                if num == 0 || num == 1 {
+                    return Ok(Valid(num));
+                }
+            }
+
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
+
+        }, 0)?
+    };
 
     let brightness = {
         let mut brightness_file = file_open_options.open(brightness_filepath)?;
@@ -182,14 +196,9 @@ fn main() -> Result<()> {
     let mut xrandr_call = {
         let mut xrandr_call = Command::new("xrandr");
         xrandr_call.arg("--output")
-                  .arg("eDP-1")
-                  .arg("--brightness")
-                  .arg(brightness_string);
-
-        if mode == 1 {
-            xrandr_call.arg("--gamma")
-                       .arg("1.0:0.7:0.45");
-        }
+            .arg("eDP-1")
+            .arg("--brightness")
+            .arg(brightness_string);
 
         xrandr_call
     };
