@@ -1,6 +1,6 @@
 # BrightnessControl
 
-## Disclaimer: Linux Only
+## Disclaimer: Linux + Xorg Only
 
 `BrightnessControl` is a wrapper around `xrandr` that allows for easy adjustments of brightness.
 
