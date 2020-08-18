@@ -14,17 +14,10 @@ enum DataValidatorResult<T> {
 
 struct ProgramState<'a> {
     cache_directory: &'a std::path::Path,
+    file_open_options: OpenOptions,
     increment: i16,
     argument: String,
 }
-
-static file_open_options: OpenOptions = {
-    let local_file_open_options = OpenOptions::new();
-    local_file_open_options.read(true);
-    local_file_open_options.write(true);
-    local_file_open_options.create(true);
-    local_file_open_options
-};
 
 use DataValidatorResult::*;
 
@@ -95,7 +88,7 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
 fn get_mode(program_state: &ProgramState) -> Result<u8> {
     let mode_filepath = program_state.cache_directory.join("mode");
 
-    let mut mode_file = file_open_options.open(mode_filepath)?;
+    let mut mode_file = program_state.file_open_options.open(mode_filepath)?;
     mode_file.set_len(1)?;
 
     let toggled_mode: Option<u8> = {
@@ -191,7 +184,7 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
 fn get_displays(program_state: &ProgramState) -> Result<Vec<String>> {
     let displays_filepath = program_state.cache_directory.join("displays");
 
-    let mut displays_file = file_open_options.open(displays_filepath)?;
+    let mut displays_file = program_state.file_open_options.open(displays_filepath)?;
 
     if program_state.argument.eq("--configure-display") {
         configure_displays(&mut displays_file)
@@ -213,7 +206,7 @@ fn get_displays(program_state: &ProgramState) -> Result<Vec<String>> {
 fn get_brightness(program_state: &ProgramState) -> Result<i16> {
     let brightness_filepath = program_state.cache_directory.join("brightness");
 
-    let mut brightness_file = file_open_options.open(brightness_filepath)?;
+    let mut brightness_file = program_state.file_open_options.open(brightness_filepath)?;
 
     get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
         // need to trim this because the newline character breaks the parse
@@ -243,6 +236,14 @@ fn main() -> Result<()> {
     let project_directory = get_project_directory()?;
     let cache_directory = project_directory.cache_dir();
 
+    let file_open_options = {
+        let mut file_open_options = OpenOptions::new();
+        file_open_options.read(true);
+        file_open_options.write(true);
+        file_open_options.create(true);
+        file_open_options
+    };
+
     let mut args = std::env::args();
 
     let arg = args.nth(1);
@@ -254,6 +255,7 @@ fn main() -> Result<()> {
 
     let program_state = ProgramState {
         cache_directory,
+        file_open_options,
         increment,
         argument: arg_unwrapped
     };
