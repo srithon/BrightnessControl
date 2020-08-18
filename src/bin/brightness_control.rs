@@ -251,8 +251,6 @@ fn main() -> Result<()> {
 
     let increment = arg_unwrapped.parse::<i16>().unwrap_or(0);
 
-    let brightness_filepath = cache_directory.join("brightness");
-
     let program_state = ProgramState {
         cache_directory,
         file_open_options,
