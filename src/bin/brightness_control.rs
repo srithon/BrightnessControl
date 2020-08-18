@@ -210,7 +210,7 @@ fn get_displays(program_state: &ProgramState) -> Result<Vec<String>> {
     }
 }
 
-fn get_brightness(program_state: &ProgramState) -> Result<u16> {
+fn get_brightness(program_state: &ProgramState) -> Result<i16> {
     let brightness_filepath = program_state.cache_directory.join("brightness");
 
     let mut brightness_file = file_open_options.open(brightness_filepath)?;
@@ -222,7 +222,7 @@ fn get_brightness(program_state: &ProgramState) -> Result<u16> {
             if num >= 0 {
                 // ensure range of [0, 100]
                 // <<NOTE>> weird behavior incase of overflow
-                let new_num = cmp::max(cmp::min(increment + num, 100), 0);
+                let new_num = cmp::max(cmp::min(program_state.increment + num, 100), 0);
 
                 if num == new_num {
                     return Ok(Valid(num));
