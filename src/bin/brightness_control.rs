@@ -30,7 +30,6 @@ fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&
                 String::from_utf8_unchecked(buffer)
             };
 
-
             data_validator(&string)
         })()
     };
@@ -83,14 +82,12 @@ fn main() -> Result<()> {
     let project_directory = get_project_directory()?;
     let cache_directory = project_directory.cache_dir();
 
-
     let mut args = std::env::args();
 
     let arg = args.nth(1);
     let arg_unwrapped = arg.unwrap_or("".to_string());
 
     let increment = arg_unwrapped.parse::<i16>().unwrap_or(0);
-
 
     let mode_filepath = cache_directory.join("mode");
     let brightness_filepath = cache_directory.join("brightness");
