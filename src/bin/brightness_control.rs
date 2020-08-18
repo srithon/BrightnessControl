@@ -1,7 +1,7 @@
 use directories::ProjectDirs;
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
+use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
 use std::fmt::Display;
 use std::process::Command;
 
@@ -91,6 +91,7 @@ fn main() -> Result<()> {
 
     let mode_filepath = cache_directory.join("mode");
     let brightness_filepath = cache_directory.join("brightness");
+    let displays_filepath = cache_directory.join("displays");
 
     let mut file_open_options = OpenOptions::new();
     file_open_options.read(true);
@@ -145,6 +146,63 @@ fn main() -> Result<()> {
         }
     };
 
+    let displays = {
+        let mut displays_file = file_open_options.open(displays_filepath)?;
+
+        if arg_unwrapped.eq("--configure-display") {
+            let mut xrandr_current = Command::new("xrandr");
+            xrandr_current.arg("--current");
+            let command_output = xrandr_current.output()?;
+            // the '&' operator dereferences ascii_code so that it can be compared with a regular u8
+            // its original type is &u8
+            let output_lines = command_output.stdout.split(| &ascii_code | ascii_code == '\n' as u8);
+            let connected_displays: Vec<String> = output_lines.filter(| line | {
+                // panic if the output is not UTF 8
+                let line_as_string = std::str::from_utf8(line).unwrap();
+                /*
+                this predicate filters out everything but the first line
+                example output
+                    eDP-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis) 344mm x 193mm
+                    HDMI-1 disconnected (normal left inverted right x axis y axis)
+                    DP-1 disconnected (normal left inverted right x axis y axis)
+                    HDMI-2 disconnected (normal left inverted right x axis y axis)*
+                 */
+                line_as_string.contains(" connected")
+            }).map(| line | {
+                // if it passed through the filter, it has to be valid UTF8
+                // therefore, this unsafe call can be made safely
+                let line_as_string = unsafe { std::str::from_utf8_unchecked(line) };
+                // panic if the output does not contain a space
+                // it has to contain a space because the filter predicate specifically has a space
+                // in it
+                // create a slice of the first Word
+                line_as_string[0..line_as_string.find(' ').unwrap()].to_owned()
+            }).collect();
+
+            // sum the lengths of each display name, and then add (number of names - 1) to account
+            // for newline separators between each name
+            // subtract 1 because there is no newline at the end
+            let displays_file_length = (connected_displays.len() - 1) +
+                connected_displays.iter().map(| display_name | display_name.len()).sum::<usize>();
+
+            // .iter() so that connected_displays is not moved
+            for display in connected_displays.iter() {
+                writeln!(displays_file, "{}", display)?;
+            }
+
+            // the above loop appends a newline to each display, including the last one
+            // however, this call to set_len() cuts out this final newline
+            displays_file.set_len(displays_file_length as u64)?;
+
+            connected_displays
+        }
+        else {
+            let buffered_display_file_reader = BufReader::new(displays_file);
+            // filter out all invalid lines and then collect them into a Vec<String>
+            buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>()
+        }
+    };
+
     let brightness = {
         let mut brightness_file = file_open_options.open(brightness_filepath)?;
         // brightness_file.set_len(3)?;
@@ -176,10 +234,14 @@ fn main() -> Result<()> {
 
     let mut xrandr_call = {
         let mut xrandr_call = Command::new("xrandr");
-        xrandr_call.arg("--output")
-                  .arg("eDP-1")
-                  .arg("--brightness")
-                  .arg(brightness_string);
+
+        for display in displays {
+            xrandr_call.arg("--output");
+            xrandr_call.arg(display);
+        }
+
+        xrandr_call.arg("--brightness")
+                   .arg(brightness_string);
 
         if mode == 1 {
             xrandr_call.arg("--gamma")
