@@ -199,7 +199,14 @@ fn get_displays(program_state: &ProgramState) -> Result<Vec<String>> {
     else {
         let buffered_display_file_reader = BufReader::new(displays_file);
         // filter out all invalid lines and then collect them into a Vec<String>
-        Ok(buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>())
+        let read_displays = buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>();
+
+        if read_displays.len() > 0 {
+            Ok(read_displays)
+        }
+        else {
+            configure_displays(&mut displays_file)
+        }
     }
 }
 
