@@ -246,16 +246,15 @@ fn main() -> Result<()> {
 
     let mut args = std::env::args();
 
-    let arg = args.nth(1);
-    let arg_unwrapped = arg.unwrap_or("".to_string());
+    let argument = args.nth(1).unwrap_or("".to_string());
 
-    let increment = arg_unwrapped.parse::<i16>().unwrap_or(0);
+    let increment = argument.parse::<i16>().unwrap_or(0);
 
     let program_state = ProgramState {
         cache_directory,
         file_open_options,
         increment,
-        argument: arg_unwrapped
+        argument
     };
 
     let mode = get_mode(&program_state)?;
