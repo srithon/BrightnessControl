@@ -16,4 +16,6 @@ auto-reconfigure = []
 # use redshift for blue light filter
 redshift = []
 
+##########################
+# this is not a feature
 default = []
