@@ -8,3 +8,9 @@ edition = "2018"
 
 [dependencies]
 directories = "2.0.2"
+
+[features]
+# reconfigures display if xrandr call fails
+auto-reconfigure = []
+
+default = ["auto-reconfigure"]

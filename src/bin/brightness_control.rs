@@ -285,15 +285,21 @@ fn main() -> Result<()> {
 
     let mut xrandr_call = create_xrandr_command(displays, &brightness_string, mode);
 
-    let exit_status = xrandr_call.spawn()?.wait()?;
+    // this variable is only used if the "auto-reconfigure" feature is enabled
+    let mut _call_handle = xrandr_call.spawn()?;
 
-    // if the call fails, then the configuration is no longer valid
-    // reconfigures the display and then tries again
-    if !exit_status.success() {
-        println!("Reconfiguring!");
-        // force reconfigure
-        let displays = get_displays(&program_state, true)?;
-        create_xrandr_command(displays, &brightness_string, mode).spawn()?;
+    #[cfg(feature = "auto-reconfigure")]
+    {
+        let exit_status = _call_handle.wait()?;
+
+        // if the call fails, then the configuration is no longer valid
+        // reconfigures the display and then tries again
+        if !exit_status.success() {
+            println!("Reconfiguring!");
+            // force reconfigure
+            let displays = get_displays(&program_state, true)?;
+            create_xrandr_command(displays, &brightness_string, mode).spawn()?;
+        }
     }
 
     Ok(())
