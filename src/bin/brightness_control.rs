@@ -181,12 +181,12 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
     Ok(connected_displays)
 }
 
-fn get_displays(program_state: &ProgramState) -> Result<Vec<String>> {
+fn get_displays(program_state: &ProgramState, force_reconfigure: bool) -> Result<Vec<String>> {
     let displays_filepath = program_state.cache_directory.join("displays");
 
     let mut displays_file = program_state.file_open_options.open(displays_filepath)?;
 
-    if program_state.argument.eq("--configure-display") {
+    if force_reconfigure || program_state.argument.eq("--configure-display") {
         configure_displays(&mut displays_file)
     }
     else {
@@ -258,7 +258,7 @@ fn main() -> Result<()> {
     };
 
     let mode = get_mode(&program_state)?;
-    let displays = get_displays(&program_state)?;
+    let displays = get_displays(&program_state, false)?;
     let brightness = get_brightness(&program_state)?;
 
     let brightness_string = format!("{:.2}", brightness as f32 / 100.0);
