@@ -6,8 +6,9 @@
 
 This brightness is separate from the backlight.
 
-It also allows for an emulation of a blue light filter / night light, which can be toggled on/off. For a true blue light filter, look at the `redshift` branch of this project
+It also allows for a blue light filter, which can be toggled on/off.
 
+This branch depends on `redshift` to be installed.
 
 Internally, the brightness is stored in `~/.cache/brightnesscontrol/brightness`
 
@@ -82,6 +83,12 @@ cargo install --features auto-reconfigure --path . --root ~/.local/
 `cargo` will append `bin/` to the end of the path that you pass in for `--root`, so the above command will install the executable into `~/.local/bin/`
 
 This is because `brightness_control.rs` is inside of a `bin` subdirectory
+
+### Configuring Redshift
+*Change redshift's adjustment mode*
+```
+sed -i 's/adjustment-method=randr/adjustment-method=vidmode' ~/.config/redshift.conf
+```
 
 ## Usage
 *All examples assume that the name of the executable is `brightness_control` and that the executable can be found in one of the directories in the `PATH` environmental variable*
