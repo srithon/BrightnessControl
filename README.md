@@ -33,8 +33,7 @@ When this feature is not enabled, the program takes less time to run because it 
 
 However, the runtime difference will be negligible for most users.
 
-The following benchmarks were run using [[https://github.com/sharkdp/hyperfine|hyperfine]]
-
+The following benchmarks were run using [hyperfine](https://github.com/sharkdp/hyperfine)
 **With auto-reconfigure enabled**
 ```
 Benchmark #0: ~/.local/bin/brightness_control + 0.01
