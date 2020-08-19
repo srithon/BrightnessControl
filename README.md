@@ -6,9 +6,9 @@
 
 This brightness is separate from the backlight.
 
-It also allows for a blue light filter, which can be toggled on/off.
+It also allows for an emulation of a blue light filter / night light, which can be toggled on/off. This emulation is part of `xrandr` itself.
 
-This branch depends on `redshift` to be installed.
+To use `redshift` instead of `xrandr` for the blue light filter, pass in the `redshift` feature during installation. Details on how to do this will be in the `Installation` section
 
 Internally, the brightness is stored in `~/.cache/brightnesscontrol/brightness`
 
@@ -65,17 +65,23 @@ _General Notes_
 ## Installation
 *From the project root*
 
-**WITHOUT auto-reconfigure**
+The list of features that are enabled by default are under the `[features]` section in `Cargo.toml`
+Currently, there are no features enabled by default; this is denoted by the following line
+`default = []`
+
+**WITH DEFAULT FEATURES**
 ```
 cargo install --path . --root ~/.local/
 ```
 
-**WITH auto-reconfigure**
-Pass in `--features auto-reconfigure` to `cargo` during installation
+**WITH OPTIONAL FEATURES**
+During installation, pass in a space-separated list of the features that you want after `--features`
 
-The resulting command is below
+The list of available features can be found in the `[features]` section in `Cargo.toml`
+
+The resulting command is below; anything in square brackets is optional
 ```
-cargo install --features auto-reconfigure --path . --root ~/.local/
+cargo install --features [auto-reconfigure] [redshift] --path . --root ~/.local/
 ```
 
 ***
