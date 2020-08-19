@@ -230,6 +230,25 @@ fn get_brightness(program_state: &ProgramState) -> Result<i16> {
     }, 100)
 }
 
+fn create_xrandr_command(displays: Vec<String>, brightness: &String, mode: u8) -> Command {
+    let mut xrandr_call = Command::new("xrandr");
+
+    for display in displays {
+        xrandr_call.arg("--output");
+        xrandr_call.arg(display);
+    }
+
+    xrandr_call.arg("--brightness")
+        .arg(&brightness);
+
+    if mode == 1 {
+        xrandr_call.arg("--gamma")
+            .arg("1.0:0.7:0.45");
+    }
+
+    xrandr_call
+}
+
 fn main() -> Result<()> {
     // step 1
     // check if redshift mode or xrandr mode
@@ -264,26 +283,18 @@ fn main() -> Result<()> {
     let brightness_string = format!("{:.2}", brightness as f32 / 100.0);
     println!("Brightness: {}", brightness_string);
 
-    let mut xrandr_call = {
-        let mut xrandr_call = Command::new("xrandr");
+    let mut xrandr_call = create_xrandr_command(displays, &brightness_string, mode);
 
-        for display in displays {
-            xrandr_call.arg("--output");
-            xrandr_call.arg(display);
-        }
+    let exit_status = xrandr_call.spawn()?.wait()?;
 
-        xrandr_call.arg("--brightness")
-                   .arg(brightness_string);
-
-        if mode == 1 {
-            xrandr_call.arg("--gamma")
-                       .arg("1.0:0.7:0.45");
-        }
-
-        xrandr_call
-    };
-
-    xrandr_call.spawn()?;
+    // if the call fails, then the configuration is no longer valid
+    // reconfigures the display and then tries again
+    if !exit_status.success() {
+        println!("Reconfiguring!");
+        // force reconfigure
+        let displays = get_displays(&program_state, true)?;
+        create_xrandr_command(displays, &brightness_string, mode).spawn()?;
+    }
 
     Ok(())
 }
