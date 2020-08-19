@@ -13,4 +13,7 @@ directories = "2.0.2"
 # reconfigures display if xrandr call fails
 auto-reconfigure = []
 
+# use redshift for blue light filter
+redshift = []
+
 default = []

@@ -117,23 +117,26 @@ fn get_mode(program_state: &ProgramState) -> Result<u8> {
     };
 
     if let Some(mode) = toggled_mode { 
-        match mode {
-            0 => {
-                // turn off redshift
-                let mut redshift_disable = Command::new("redshift");
-                redshift_disable.arg("-x");
-                redshift_disable.spawn()?;
-            },
-            1 => {
-                // turn on redshift
-                let mut redshift_enable = Command::new("redshift");
-                redshift_enable.arg("-r");
-                redshift_enable.arg("-o");
-                redshift_enable.arg("4700");
-                redshift_enable.spawn()?;
-            },
-            _ => panic!("Mode is {}!?", mode)
-        };
+        #[cfg(feature = "redshift")]
+        {
+            match mode {
+                0 => {
+                    // turn off redshift
+                    let mut redshift_disable = Command::new("redshift");
+                    redshift_disable.arg("-x");
+                    redshift_disable.spawn()?;
+                },
+                1 => {
+                    // turn on redshift
+                    let mut redshift_enable = Command::new("redshift");
+                    redshift_enable.arg("-r");
+                    redshift_enable.arg("-o");
+                    redshift_enable.arg("4700");
+                    redshift_enable.spawn()?;
+                },
+                _ => panic!("Mode is {}!?", mode)
+            };
+        }
 
         Ok(mode)
     }
@@ -258,6 +261,14 @@ fn create_xrandr_command(displays: Vec<String>, brightness: &String, mode: u8) -
 
     xrandr_call.arg("--brightness")
         .arg(&brightness);
+
+    #[cfg(not(feature = "redshift"))]
+    {
+        if mode == 1 {
+            xrandr_call.arg("--gamma")
+                .arg("1.0:0.7:0.45");
+        }
+    }
 
     xrandr_call
 }
