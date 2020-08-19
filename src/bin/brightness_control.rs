@@ -250,7 +250,7 @@ fn get_brightness(program_state: &ProgramState) -> Result<i16> {
     }, 100)
 }
 
-fn create_xrandr_command(displays: Vec<String>, brightness: &String, mode: u8) -> Command {
+fn create_xrandr_command(displays: Vec<String>, brightness: &String, _mode: u8) -> Command {
     let mut xrandr_call = Command::new("xrandr");
 
     for display in displays {
@@ -263,7 +263,7 @@ fn create_xrandr_command(displays: Vec<String>, brightness: &String, mode: u8) -
 
     #[cfg(not(feature = "redshift"))]
     {
-        if mode == 1 {
+        if _mode == 1 {
             xrandr_call.arg("--gamma")
                 .arg("1.0:0.7:0.45");
         }
