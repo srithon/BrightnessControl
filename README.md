@@ -22,17 +22,60 @@ It is either `0` or `1`
 
 `1`: nightlight is on
 
-If you modify either of these files from outside the program, run the executable with no arguments to make the changes active
+If the file contents are invalid, they are automatically defaulted and overwritten for both `brightness` and `mode`
 
-These files are automatically created if they do not exist
+The displays that BrightnessControl will supply to its `xrandr` calls are stored in `~/.cache/brightnesscontrol/displays`
 
-Also, if the file contents are invalid, they are automatically defaulted and overwritten
+If the executable is called and the `displays` file is empty or non-existent, it will automatically populate the file with the current display configuration
+
+If the `xrandr` call *fails* as a result of invalid/outdated data in the cache, the program will automatically reconfigure the display **IF** the `auto-reconfigure` feature is enabled at compile-time.
+
+When this feature is not enabled, the program takes less time to run because it does not have to wait for the `xrandr` call to terminate before terminating itself
+
+However, the runtime difference will be negligible for most users.
+
+The following benchmarks were run using [[https://github.com/sharkdp/hyperfine|hyperfine]]
+
+**With auto-reconfigure enabled**
+Benchmark #0: ~/.local/bin/brightness_control + 0.01
+  Time (mean ± σ):      28.7 ms ±   4.8 ms    [User: 9.6 ms, System: 6.3 ms]
+  Range (min … max):    13.5 ms …  32.1 ms    90 runs
+
+**Without auto-reconfigure enabled**
+Benchmark #1: ~/.local/bin/brightness_control + 0.01
+  Time (mean ± σ):       0.9 ms ±   0.4 ms    [User: 0.9 ms, System: 1.0 ms]
+  Range (min … max):     0.5 ms …   2.6 ms    90 runs
+
+Instructions on how to enable/disable this feature are in the Installation section
+
+_General Notes_
+* If you modify any of these files from outside the program, run the executable with no arguments to make the changes active
+* All 3 of these files are automatically created and populated if they do not exist
+  * if `brightness` or `mode` contain invalid data, they will be defaulted and overwritten
+  * if `displays` contains invalid data and causes the `xrandr` call to fail, it will be overwritten if the `auto-reconfigure` feature is enabled
+    * this can happen if an adapter is disconnected after the configuration is made
+      * **however, if the reverse happens and a display is added after the configuration is made, auto-reconfigure will not reconfigure**
+        * instructions on how to manually reconfigure are in the `Usage` section
+    * *if you are going to be changing your display configuration often, you should probably use the feature*
 
 ## Installation
 *From the project root*
+
+**WITHOUT auto-reconfigure**
 ```
 cargo install --path . --root ~/.local/
 ```
+
+**WITH auto-reconfigure**
+Pass in `--features auto-reconfigure` to `cargo` during installation
+
+The resulting command is below
+```
+cargo install --features auto-reconfigure --path . --root ~/.local/
+```
+
+***
+
 `cargo` will append `bin/` to the end of the path that you pass in for `--root`, so the above command will install the executable into `~/.local/bin/`
 
 This is because `brightness_control.rs` is inside of a `bin` subdirectory
@@ -64,4 +107,10 @@ brightness_control
 *To Toggle Night Light*
 ```
 brightness_control --toggle
+```
+
+*To Reconfigure the Cached Display Settings*
+  This is necessary when a new display adapter is connected
+```
+brightness_control --configure-display
 ```

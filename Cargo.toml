@@ -1,6 +1,6 @@
 [package]
 name = "brightness_control"
-version = "1.0.0"
+version = "1.1.1"
 authors = ["Sridaran Thoniyil <sri7thon@gmail.com>"]
 edition = "2018"
 
@@ -8,3 +8,9 @@ edition = "2018"
 
 [dependencies]
 directories = "2.0.2"
+
+[features]
+# reconfigures display if xrandr call fails
+auto-reconfigure = []
+
+default = []
