@@ -75,6 +75,7 @@ cargo install --path . --root ~/.local/
 ```
 
 **WITH OPTIONAL FEATURES**
+
 During installation, pass in a space-separated list of the features that you want after `--features`
 
 The list of available features can be found in the `[features]` section in `Cargo.toml`
@@ -120,7 +121,8 @@ brightness_control --toggle
 ```
 
 *To Reconfigure the Cached Display Settings*
-  This is necessary when a new display adapter is connected
+
+This is necessary when a new display adapter is connected
 ```
 brightness_control --configure-display
 ```
