@@ -37,14 +37,18 @@ However, the runtime difference will be negligible for most users.
 The following benchmarks were run using [[https://github.com/sharkdp/hyperfine|hyperfine]]
 
 **With auto-reconfigure enabled**
+```
 Benchmark #0: ~/.local/bin/brightness_control + 0.01
   Time (mean ± σ):      28.7 ms ±   4.8 ms    [User: 9.6 ms, System: 6.3 ms]
   Range (min … max):    13.5 ms …  32.1 ms    90 runs
+```
 
 **Without auto-reconfigure enabled**
+```
 Benchmark #1: ~/.local/bin/brightness_control + 0.01
   Time (mean ± σ):       0.9 ms ±   0.4 ms    [User: 0.9 ms, System: 1.0 ms]
   Range (min … max):     0.5 ms …   2.6 ms    90 runs
+```
 
 Instructions on how to enable/disable this feature are in the Installation section
 
