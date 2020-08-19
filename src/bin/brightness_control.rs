@@ -129,9 +129,8 @@ fn get_mode(program_state: &ProgramState) -> Result<u8> {
                 1 => {
                     // turn on redshift
                     let mut redshift_enable = Command::new("redshift");
-                    redshift_enable.arg("-r");
-                    redshift_enable.arg("-o");
-                    redshift_enable.arg("4700");
+                    redshift_enable.arg("-O");
+                    redshift_enable.arg("1400");
                     redshift_enable.spawn()?;
                 },
                 _ => panic!("Mode is {}!?", mode)
