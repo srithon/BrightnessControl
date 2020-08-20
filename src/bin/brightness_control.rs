@@ -309,6 +309,11 @@ fn get_cli_interface() -> Options {
     options
 }
 
+fn print_help(program_invocation_name: &str, cli: &Options) {
+    let brief = format!("Usage: {} [options]", program_invocation_name);
+    print!("{}", cli.usage(&brief));
+}
+
 fn main() -> Result<()> {
     // step 1
     // check if redshift mode or xrandr mode
@@ -332,12 +337,20 @@ fn main() -> Result<()> {
 
     let matches = match cli.parse(&args[1..]) {
         Ok(matches) => matches,
-        Err(error) => panic!(error.to_string())
+        Err(error) => {
+            let error_string = error.to_string();
+            eprintln!("Syntax error: {}\n", error_string);
+            print_help(&program_invocation_name, &cli);
+
+            // if an Err is returned instead, the Termination trait automatically serializes the
+            // Err and prints it out
+            // we do not want anything to be printed out, so instead of returning an Err, we
+            // manually terminate the program with exit code 1
+            std::process::exit(1);
+        }
     };
 
     if matches.opt_present("help") {
-        let brief = format!("Usage: {} [options]", program_invocation_name);
-        print!("{}", cli.usage(&brief));
         return Ok(());
     }
 
