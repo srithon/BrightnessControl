@@ -38,16 +38,16 @@ The following benchmarks were run using [hyperfine](https://github.com/sharkdp/h
 
 **With auto-reconfigure enabled**
 ```
-Benchmark #0: ~/.local/bin/brightness_control + 0.01
-  Time (mean ± σ):      27.9 ms ±   7.7 ms    [User: 7.0 ms, System: 6.1 ms]
-  Range (min … max):     9.6 ms …  44.8 ms    90 runs
+Benchmark #0: ~/.local/bin/brightness_control --increment 1
+  Time (mean ± σ):      26.0 ms ±   8.7 ms    [User: 5.9 ms, System: 5.7 ms]
+  Range (min … max):     7.9 ms …  43.8 ms    90 runs
 ```
 
 **Without auto-reconfigure enabled**
 ```
-Benchmark #1: ~/.local/bin/brightness_control + 0.01
-  Time (mean ± σ):       4.1 ms ±   3.3 ms    [User: 2.3 ms, System: 1.9 ms]
-  Range (min … max):     0.0 ms …  10.2 ms    90 runs
+Benchmark #1: ~/.local/bin/brightness_control --increment 1
+  Time (mean ± σ):       0.2 ms ±   0.4 ms    [User: 0.4 ms, System: 0.7 ms]
+  Range (min … max):     0.0 ms …   2.4 ms    90 runs
 ```
 
 Instructions on how to enable/disable this feature are in the Installation section
