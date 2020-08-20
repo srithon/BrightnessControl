@@ -312,10 +312,21 @@ fn main() -> Result<()> {
 
     let cli = get_cli_interface();
     let args = std::env::args().collect::<Vec<String>>();
+
+    // this lets you see exactly how the user invoked the program
+    // this is then used in the help screen
+    let program_invocation_name = args[0].clone();
+
     let matches = match cli.parse(&args[1..]) {
         Ok(matches) => matches,
         Err(error) => panic!(error.to_string())
     };
+
+    if matches.opt_present("help") {
+        let brief = format!("Usage: {} [options]", program_invocation_name);
+        print!("{}", cli.usage(&brief));
+        return Ok(());
+    }
 
     let brightness = {
         let increment = matches.opt_str("increment");
