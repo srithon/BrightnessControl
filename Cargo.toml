@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 directories = "2.0.2"
+getopts = "0.2.2"
 
 [features]
 # reconfigures display if xrandr call fails
