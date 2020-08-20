@@ -164,7 +164,7 @@ fn get_mode(program_state: &ProgramState) -> Result<u8> {
     }
 }
 
-fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
+fn get_current_connected_displays() -> Result<Vec<String>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
     let command_output = xrandr_current.output()?;
@@ -193,6 +193,12 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
         // create a slice of the first Word
         line_as_string[0..line_as_string.find(' ').unwrap()].to_owned()
     }).collect();
+
+    connected_displays
+}
+
+fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
+    let connected_displays = get_current_connected_displays()?;
 
     // sum the lengths of each display name, and then add (number of names - 1) to account
     // for newline separators between each name
