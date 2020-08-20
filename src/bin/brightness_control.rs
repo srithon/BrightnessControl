@@ -13,6 +13,17 @@ enum DataValidatorResult<T> {
     Changed(T),
 }
 
+enum BrightnessChange {
+    Adjustment(i8),
+    Set(u8)
+}
+
+struct ProgramInput {
+    brightness: Option<BrightnessChange>,
+    configure_display: bool,
+    toggle_nightlight: bool
+}
+
 struct ProgramState<'a> {
     cache_directory: &'a std::path::Path,
     file_open_options: OpenOptions,
