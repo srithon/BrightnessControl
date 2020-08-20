@@ -67,6 +67,16 @@ impl Daemon {
     fn get_displays_file(&self) -> Result<File> {
         self.open_cache_file("displays")
     }
+
+    fn get_written_displays(&self) -> Result<Vec<String>> {
+        let displays_file = self.get_displays_file();
+
+        let buffered_display_file_reader = BufReader::new(&mut displays_file);
+        // filter out all invalid lines and then collect them into a Vec<String>
+        let read_displays = buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>();
+
+        Ok(read_displays)
+    }
 }
 
 use DataValidatorResult::*;
@@ -255,28 +265,6 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
     displays_file.set_len(displays_file_length as u64)?;
 
     Ok(connected_displays)
-}
-
-fn get_displays(program_state: &ProgramState, force_reconfigure: bool) -> Result<Vec<String>> {
-    let displays_filepath = program_state.cache_directory.join("displays");
-
-    let mut displays_file = program_state.file_open_options.open(displays_filepath)?;
-
-    if force_reconfigure || program_state.program_input.configure_display {
-        configure_displays(&mut displays_file)
-    }
-    else {
-        let buffered_display_file_reader = BufReader::new(&mut displays_file);
-        // filter out all invalid lines and then collect them into a Vec<String>
-        let read_displays = buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>();
-
-        if read_displays.len() > 0 {
-            Ok(read_displays)
-        }
-        else {
-            configure_displays(&mut displays_file)
-        }
-    }
 }
 
 fn get_brightness(program_state: &ProgramState) -> Result<u8> {
