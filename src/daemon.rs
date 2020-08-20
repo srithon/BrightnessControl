@@ -24,10 +24,9 @@ pub struct ProgramInput {
     toggle_nightlight: bool
 }
 
-struct ProgramState<'a> {
+struct FileUtils<'a> {
     cache_directory: &'a std::path::Path,
     file_open_options: OpenOptions,
-    program_input: ProgramInput
 }
 
 use DataValidatorResult::*;
