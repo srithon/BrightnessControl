@@ -1,3 +1,4 @@
+use getopts::Options;
 use directories::ProjectDirs;
 
 use std::fs::{self, File, OpenOptions};
@@ -270,6 +271,19 @@ fn create_xrandr_command(displays: Vec<String>, brightness: &String, _mode: u8) 
     }
 
     xrandr_call
+}
+
+fn get_cli_interface() -> Options {
+    let mut options = Options::new();
+    options
+        .parsing_style(getopts::ParsingStyle::FloatingFrees)
+        .optflag("h", "help", "Prints the help menu")
+        .optflag("", "configure-display", "Uses the current display configuration for future calls to BrightnessControl")
+        .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
+        .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
+        .optopt("i", "increment", "Increments the current brightness by some (integer) percentage. It can be negative", "PERCENTAGE")
+        .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage. It can be positive", "PERCENTAGE");
+    options
 }
 
 fn main() -> Result<()> {
