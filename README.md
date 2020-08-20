@@ -102,12 +102,17 @@ sed -i 's/adjustment-method=randr/adjustment-method=vidmode' ~/.config/redshift.
 
 *To Reduce the Brightness by 10%*
 ```
-brightness_control -10
+brightness_control --decrement 10
 ```
 
 *To Increase the Brightness by 10%*
 ```
-brightness_control 10
+brightness_control --increment 10
+```
+
+*To Set the Brightness to 80%*
+```
+brightness_control --set 80
 ```
 
 *To Refresh the Current Brightness*
@@ -117,7 +122,7 @@ brightness_control
 
 *To Toggle Night Light*
 ```
-brightness_control --toggle
+brightness_control --toggle-nightlight
 ```
 
 *To Reconfigure the Cached Display Settings*
@@ -125,4 +130,9 @@ brightness_control --toggle
 This is necessary when a new display adapter is connected
 ```
 brightness_control --configure-display
+```
+
+*To View the Help Menu*
+```
+brightness_control --help
 ```
