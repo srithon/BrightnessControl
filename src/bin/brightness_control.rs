@@ -234,26 +234,39 @@ fn get_displays(program_state: &ProgramState, force_reconfigure: bool) -> Result
     }
 }
 
-fn get_brightness(program_state: &ProgramState) -> Result<i16> {
+fn get_brightness(program_state: &ProgramState) -> Result<u8> {
     let brightness_filepath = program_state.cache_directory.join("brightness");
 
     let mut brightness_file = program_state.file_open_options.open(brightness_filepath)?;
 
+    let brightness_input = &program_state.program_input.brightness;
+
     get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
+        if let Some(BrightnessChange::Set(new_brightness)) = brightness_input {
+            // have to dereference this because the value has to be stored directly
+            return Ok(Changed(*new_brightness));
+        }
+
         // need to trim this because the newline character breaks the parse
-        if let Ok(num) = data_in_file.trim_end().parse::<i16>() {
-
-            if num >= 0 {
-                // ensure range of [0, 100]
-                // <<NOTE>> weird behavior incase of overflow
-                let new_num = cmp::max(cmp::min(program_state.increment + num, 100), 0);
-
-                if num == new_num {
-                    return Ok(Valid(num));
+        if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
+            // ensure range of [0, 100]
+            // <<NOTE>> weird behavior incase of overflow
+            let new_num = {
+                if let Some(BrightnessChange::Adjustment(increment)) = brightness_input {
+                    // do not have to dereference "increment" because it is being used in
+                    // arithmetic and does not have to be stored directly
+                    cmp::max(cmp::min(increment + (num as i8), 100), 0) as u8
                 }
                 else {
-                    return Ok(Changed(new_num));
+                    num
                 }
+            };
+
+            if num == new_num {
+                return Ok(Valid(num));
+            }
+            else {
+                return Ok(Changed(new_num));
             }
         }
 
