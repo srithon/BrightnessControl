@@ -2,6 +2,8 @@
 
 ## Disclaimer: Linux + Xorg Only
 
+## THIS BRANCH IS CURRENTLY IN DEVELOPMENT
+
 `BrightnessControl` is a wrapper around `xrandr` that allows for easy adjustments of brightness.
 
 This brightness is separate from the backlight.
