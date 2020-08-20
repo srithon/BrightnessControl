@@ -82,7 +82,7 @@ The list of available features can be found in the `[features]` section in `Carg
 
 The resulting command is below; anything in square brackets is optional
 ```
-cargo install --features [auto-reconfigure] [redshift] --path . --root ~/.local/
+cargo install --features "[auto-reconfigure] [redshift]" --path . --root ~/.local/
 ```
 
 ***
