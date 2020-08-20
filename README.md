@@ -60,7 +60,7 @@ _General Notes_
     * this can happen if an adapter is disconnected after the configuration is made
       * **however, if the reverse happens and a display is added after the configuration is made, auto-reconfigure will not reconfigure**
         * instructions on how to manually reconfigure are in the `Usage` section
-    * *if you are going to be changing your display configuration often, you should probably use the feature*
+    * this feature may be useful for you if you change your display configuration often
 
 ## Installation
 *From the project root*
