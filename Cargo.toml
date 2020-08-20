@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 directories = "2.0.2"
 getopts = "0.2.2"
+daemonize = "0.4.1"
 
 [features]
 # reconfigures display if xrandr call fails
