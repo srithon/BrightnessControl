@@ -351,6 +351,7 @@ fn main() -> Result<()> {
     };
 
     if matches.opt_present("help") {
+        print_help(&program_invocation_name, &cli);
         return Ok(());
     }
 
