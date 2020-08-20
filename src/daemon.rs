@@ -29,6 +29,46 @@ struct FileUtils<'a> {
     file_open_options: OpenOptions,
 }
 
+struct Daemon<'a> {
+    brightness: u8,
+    mode: u8,
+    displays: Vec<String>,
+    file_utils: FileUtils<'a>
+}
+
+impl Daemon {
+    fn new() -> Daemon {
+        let blank_input = ProgramInput {
+            brightness: None,
+            configure_display: false,
+            toggle_nightlight: false
+        };
+
+        Daemon {
+            brightness: 0,
+            mode: 0,
+            displays: Vec::new()
+        }
+    }
+
+    fn open_cache_file(&self, file_name: &str) -> Result<File> {
+        let filepath = self.file_utils.cache_directory.join(file_name);
+        self.file_utils.file_open_options.open(filepath)
+    }
+
+    fn get_mode_file(&self) -> Result<File> {
+        self.open_cache_file("mode")
+    }
+
+    fn get_brightness_file(&self) -> Result<File> {
+        self.open_cache_file("brightness")
+    }
+
+    fn get_displays_file(&self) -> Result<File> {
+        self.open_cache_file("displays")
+    }
+}
+
 use DataValidatorResult::*;
 
 // where ....
