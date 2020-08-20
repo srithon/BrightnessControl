@@ -27,8 +27,7 @@ struct ProgramInput {
 struct ProgramState<'a> {
     cache_directory: &'a std::path::Path,
     file_open_options: OpenOptions,
-    increment: i16,
-    argument: String,
+    program_input: ProgramInput
 }
 
 use DataValidatorResult::*;
@@ -389,8 +388,7 @@ fn main() -> Result<()> {
     let program_state = ProgramState {
         cache_directory,
         file_open_options,
-        increment,
-        argument
+        program_input
     };
 
     let mode = get_mode(&program_state)?;
