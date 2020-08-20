@@ -38,7 +38,7 @@ The following benchmarks were run using [hyperfine](https://github.com/sharkdp/h
 
 **With auto-reconfigure enabled**
 ```
-Benchmark #1: ~/.local/bin/brightness_control + 0.01
+Benchmark #0: ~/.local/bin/brightness_control + 0.01
   Time (mean ± σ):      27.9 ms ±   7.7 ms    [User: 7.0 ms, System: 6.1 ms]
   Range (min … max):     9.6 ms …  44.8 ms    90 runs
 ```
