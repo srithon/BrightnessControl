@@ -103,7 +103,7 @@ fn get_mode(program_state: &ProgramState) -> Result<u8> {
     mode_file.set_len(1)?;
 
     let toggled_mode: Option<u8> = {
-        if program_state.increment == 0 && program_state.argument.eq("--toggle") {
+        if program_state.program_input.toggle_nightlight {
             Some((|| -> Result<u8> {
                 // toggle code
                 let mut char_buffer: [u8; 1] = [0; 1];
@@ -217,7 +217,7 @@ fn get_displays(program_state: &ProgramState, force_reconfigure: bool) -> Result
 
     let mut displays_file = program_state.file_open_options.open(displays_filepath)?;
 
-    if force_reconfigure || program_state.argument.eq("--configure-display") {
+    if force_reconfigure || program_state.program_input.configure_display {
         configure_displays(&mut displays_file)
     }
     else {
