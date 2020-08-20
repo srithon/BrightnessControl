@@ -304,8 +304,8 @@ fn get_cli_interface() -> Options {
         .optflag("c", "configure-display", "Uses the current display configuration for future calls to BrightnessControl")
         .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
         .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
-        .optopt("i", "increment", "Increments the current brightness by some (integer) percentage. It can be negative", "PERCENTAGE")
-        .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage. It can be positive", "PERCENTAGE");
+        .optopt("i", "increment", "Increments the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
+        .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE");
     options
 }
 
