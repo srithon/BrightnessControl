@@ -146,7 +146,7 @@ use DataValidatorResult::*;
 
 // where ....
 fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<DataValidatorResult<T>>, default_value: T) -> Result<T>
-    where T: Display {
+where T: Display {
     let file_contents = {
         // wrapping in a closure allows the inner else and the
         // outer else clauses to share the same code
