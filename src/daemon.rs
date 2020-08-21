@@ -46,35 +46,12 @@ impl<'a> FileUtils<'a> {
     fn get_displays_file(&self) -> Result<File> {
         self.open_cache_file("displays")
     }
-}
-
-struct Daemon<'a> {
-    brightness: u8,
-    mode: u8,
-    displays: Vec<String>,
-    file_utils: FileUtils<'a>
-}
-
-impl<'a> Daemon<'a> {
-    fn new() -> Daemon<'a> {
-        let blank_input = ProgramInput {
-            brightness: None,
-            configure_display: false,
-            toggle_nightlight: false
-        };
-
-        Daemon {
-            brightness: 0,
-            mode: 0,
-            displays: Vec::new()
-        }
-    }
 
     // 0 for regular
     // 1 for night light
     // gets the mode written to disk; if invalid, writes a default and returns it
     pub fn get_written_mode(&self) -> Result<u8> {
-        let mut mode_file = self.file_utils.get_mode_file()?;
+        let mut mode_file = self.get_mode_file()?;
         mode_file.set_len(1)?;
 
         get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
@@ -91,7 +68,7 @@ impl<'a> Daemon<'a> {
 
     // loads displays in `displays` or writes down the real values
     pub fn get_written_displays(&self) -> Result<Vec<String>> {
-        let mut displays_file = self.file_utils.get_displays_file()?;
+        let mut displays_file = self.get_displays_file()?;
 
         let buffered_display_file_reader = BufReader::new(&mut displays_file);
         // filter out all invalid lines and then collect them into a Vec<String>
@@ -106,7 +83,7 @@ impl<'a> Daemon<'a> {
     }
 
     pub fn get_written_brightness(&self) -> Result<u8> {
-        let mut brightness_file = self.file_utils.get_brightness_file()?;
+        let mut brightness_file = self.get_brightness_file()?;
 
         get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
             // need to trim this because the newline character breaks the parse
@@ -119,6 +96,32 @@ impl<'a> Daemon<'a> {
 
             return Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"));
         }, 100)
+    }
+
+}
+
+struct Daemon<'a> {
+    brightness: u8,
+    mode: u8,
+    displays: Vec<String>,
+    file_utils: FileUtils<'a>
+}
+
+impl<'a> Daemon<'a> {
+    fn new() -> Daemon<'a> {
+        fn new() -> Daemon<'a> {
+            let blank_input = ProgramInput {
+                brightness: None,
+                configure_display: false,
+                toggle_nightlight: false
+            };
+
+            Daemon {
+                brightness: 0,
+                mode: 0,
+                displays: Vec::new()
+            }
+        }
     }
 
     pub fn create_xrandr_command(&self) -> Command {
