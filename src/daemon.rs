@@ -132,6 +132,17 @@ impl<'a> Daemon<'a> {
         )
     }
 
+    // pass in blank input to process_input to refresh
+    fn refresh_configuration(&mut self) -> Result<()> {
+        let blank_input = ProgramInput {
+            brightness: None,
+            toggle_nightlight: false,
+            configure_display: false
+        };
+
+        self.process_input(blank_input)
+    }
+
     fn process_input(&mut self, program_input: ProgramInput) -> Result<()> {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
