@@ -108,20 +108,28 @@ struct Daemon<'a> {
 }
 
 impl<'a> Daemon<'a> {
-    fn new() -> Daemon<'a> {
-        fn new() -> Daemon<'a> {
-            let blank_input = ProgramInput {
-                brightness: None,
-                configure_display: false,
-                toggle_nightlight: false
-            };
+    fn new(project_directory: &'a ProjectDirs) -> Result<Daemon<'a>> {
+        let file_open_options = {
+            let mut file_open_options = OpenOptions::new();
+            file_open_options.read(true);
+            file_open_options.write(true);
+            file_open_options.create(true);
+            file_open_options
+        };
 
+        let file_utils = FileUtils {
+            cache_directory: project_directory.cache_dir(),
+            file_open_options
+        };
+
+        Ok(
             Daemon {
-                brightness: 0,
-                mode: 0,
-                displays: Vec::new()
+                brightness: file_utils.get_written_brightness()?,
+                mode: file_utils.get_written_mode()?,
+                displays: file_utils.get_written_displays()?,
+                file_utils
             }
-        }
+        )
     }
 
     pub fn create_xrandr_command(&self) -> Command {
@@ -270,13 +278,6 @@ pub fn daemon() -> Result<()> {
     let project_directory = get_project_directory()?;
     let cache_directory = project_directory.cache_dir();
 
-    let file_open_options = {
-        let mut file_open_options = OpenOptions::new();
-        file_open_options.read(true);
-        file_open_options.write(true);
-        file_open_options.create(true);
-        file_open_options
-    };
 
     let mode = get_mode(&program_state)?;
     let displays = get_displays(&program_state, false)?;
