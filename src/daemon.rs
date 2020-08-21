@@ -183,7 +183,25 @@ impl<'a> Daemon<'a> {
                     }
                 };
 
-                self.create_xrandr_command().spawn()?;
+                let _call_handle = self.create_xrandr_command().spawn()?;
+
+                #[cfg(feature = "auto-reconfigure")]
+                {
+                    let exit_status = _call_handle.wait()?;
+
+                    // if the call fails, then the configuration is no longer valid
+                    // reconfigures the display and then tries again
+                    if !exit_status.success() {
+                        println!("Reconfiguring!");
+                        // force reconfigure
+                        self.reconfigure_displays()?;
+                        self.create_xrandr_command()?.spawn()?;
+
+                        // if configure_display is true, dont want to reconfigure again
+                        // instead of branching, just return early regardless
+                        return Ok(());
+                    }
+                }
             },
             None => ()
         };
