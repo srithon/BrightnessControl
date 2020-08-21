@@ -36,8 +36,8 @@ struct Daemon<'a> {
     file_utils: FileUtils<'a>
 }
 
-impl Daemon {
-    fn new() -> Daemon {
+impl<'a> Daemon<'a> {
+    fn new() -> Daemon<'a> {
         let blank_input = ProgramInput {
             brightness: None,
             configure_display: false,
