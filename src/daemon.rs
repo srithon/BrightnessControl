@@ -50,7 +50,7 @@ impl<'a> FileUtils<'a> {
     // 0 for regular
     // 1 for night light
     // gets the mode written to disk; if invalid, writes a default and returns it
-    pub fn get_written_mode(&self) -> Result<u8> {
+    fn get_written_mode(&self) -> Result<u8> {
         let mut mode_file = self.get_mode_file()?;
         mode_file.set_len(1)?;
 
@@ -67,7 +67,7 @@ impl<'a> FileUtils<'a> {
     }
 
     // loads displays in `displays` or writes down the real values
-    pub fn get_written_displays(&self) -> Result<Vec<String>> {
+    fn get_written_displays(&self) -> Result<Vec<String>> {
         let mut displays_file = self.get_displays_file()?;
 
         let buffered_display_file_reader = BufReader::new(&mut displays_file);
@@ -82,7 +82,7 @@ impl<'a> FileUtils<'a> {
         }
     }
 
-    pub fn get_written_brightness(&self) -> Result<u8> {
+    fn get_written_brightness(&self) -> Result<u8> {
         let mut brightness_file = self.get_brightness_file()?;
 
         get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
@@ -132,7 +132,7 @@ impl<'a> Daemon<'a> {
         )
     }
 
-    pub fn create_xrandr_command(&self) -> Command {
+    fn create_xrandr_command(&self) -> Command {
         let mut xrandr_call = Command::new("xrandr");
 
         for display in &self.displays {
@@ -200,7 +200,7 @@ where T: Display {
     }
 }
 
-pub fn get_project_directory() -> Result<directories::ProjectDirs> {
+fn get_project_directory() -> Result<directories::ProjectDirs> {
     let project_directory = ProjectDirs::from("", "Sridaran Thoniyil", "BrightnessControl");
     // did not use if let because it would require the entire function to be indented
 
