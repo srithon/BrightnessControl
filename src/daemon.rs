@@ -128,11 +128,11 @@ impl<'a> Daemon<'a> {
         }
 
         xrandr_call.arg("--brightness")
-            .arg(&self.brightness);
+            .arg(&self.brightness.to_string());
 
         #[cfg(not(feature = "redshift"))]
         {
-            if &self.mode == 1 {
+            if *(&self.mode) == 1 {
                 xrandr_call.arg("--gamma")
                     .arg("1.0:0.7:0.45");
             }
