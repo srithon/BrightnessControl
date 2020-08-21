@@ -118,6 +118,28 @@ impl Daemon {
             return Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"));
         }, 100)
     }
+
+    fn create_xrandr_command(&self) -> Command {
+        let mut xrandr_call = Command::new("xrandr");
+
+        for display in &self.displays {
+            xrandr_call.arg("--output");
+            xrandr_call.arg(display);
+        }
+
+        xrandr_call.arg("--brightness")
+            .arg(&self.brightness);
+
+        #[cfg(not(feature = "redshift"))]
+        {
+            if &self.mode == 1 {
+                xrandr_call.arg("--gamma")
+                    .arg("1.0:0.7:0.45");
+            }
+        }
+
+        xrandr_call
+    }
 }
 
 use DataValidatorResult::*;
@@ -238,27 +260,6 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
     Ok(connected_displays)
 }
 
-fn create_xrandr_command(displays: Vec<String>, brightness: &String, _mode: u8) -> Command {
-    let mut xrandr_call = Command::new("xrandr");
-
-    for display in displays {
-        xrandr_call.arg("--output");
-        xrandr_call.arg(display);
-    }
-
-    xrandr_call.arg("--brightness")
-        .arg(&brightness);
-
-    #[cfg(not(feature = "redshift"))]
-    {
-        if _mode == 1 {
-            xrandr_call.arg("--gamma")
-                .arg("1.0:0.7:0.45");
-        }
-    }
-
-    xrandr_call
-}
 
 pub fn daemon() -> Result<()> {
     let project_directory = get_project_directory()?;
