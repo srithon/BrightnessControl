@@ -103,6 +103,21 @@ impl Daemon {
         }
     }
 
+    fn get_written_brightness(&self) -> Result<u8> {
+        let mut brightness_file = self.get_brightness_file()?;
+
+        get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
+            // need to trim this because the newline character breaks the parse
+            if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
+                // check bounds
+                if num <= 100 && num >= 0 {
+                    return Ok(Valid(num));
+                }
+            }
+
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"));
+        }, 100)
+    }
 }
 
 use DataValidatorResult::*;
@@ -221,46 +236,6 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
     displays_file.set_len(displays_file_length as u64)?;
 
     Ok(connected_displays)
-}
-
-fn get_brightness(program_state: &ProgramState) -> Result<u8> {
-    let brightness_filepath = program_state.cache_directory.join("brightness");
-
-    let mut brightness_file = program_state.file_open_options.open(brightness_filepath)?;
-
-    let brightness_input = &program_state.program_input.brightness;
-
-    get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
-        if let Some(BrightnessChange::Set(new_brightness)) = brightness_input {
-            // have to dereference this because the value has to be stored directly
-            return Ok(Changed(*new_brightness));
-        }
-
-        // need to trim this because the newline character breaks the parse
-        if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
-            // ensure range of [0, 100]
-            // <<NOTE>> weird behavior incase of overflow
-            let new_num = {
-                if let Some(BrightnessChange::Adjustment(increment)) = brightness_input {
-                    // do not have to dereference "increment" because it is being used in
-                    // arithmetic and does not have to be stored directly
-                    cmp::max(cmp::min(increment + (num as i8), 100), 0) as u8
-                }
-                else {
-                    num
-                }
-            };
-
-            if num == new_num {
-                return Ok(Valid(num));
-            }
-            else {
-                return Ok(Changed(new_num));
-            }
-        }
-
-        return Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"));
-    }, 100)
 }
 
 fn create_xrandr_command(displays: Vec<String>, brightness: &String, _mode: u8) -> Command {
