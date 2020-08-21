@@ -72,7 +72,7 @@ impl Daemon {
     // 1 for night light
     // gets the mode written to disk; if invalid, writes a default and returns it
     fn get_written_mode(&self) -> Result<u8> {
-        let mode_file = self.get_mode_file();
+        let mut mode_file = self.get_mode_file()?;
         mode_file.set_len(1)?;
 
         get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
@@ -89,7 +89,7 @@ impl Daemon {
 
     // loads displays in `displays` or writes down the real values
     fn get_written_displays(&self) -> Result<Vec<String>> {
-        let displays_file = self.get_displays_file();
+        let mut displays_file = self.get_displays_file()?;
 
         let buffered_display_file_reader = BufReader::new(&mut displays_file);
         // filter out all invalid lines and then collect them into a Vec<String>
