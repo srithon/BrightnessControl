@@ -132,6 +132,58 @@ impl<'a> Daemon<'a> {
         )
     }
 
+    fn process_input(&mut self, program_input: ProgramInput) -> Result<()> {
+        // avoided using destructuring because destructuring relies entirely on the order of the
+        // struct elements
+        let brightness = program_input.brightness;
+        let toggle_nightlight = program_input.toggle_nightlight;
+        let configure_display = program_input.configure_display;
+
+        if toggle_nightlight {
+            self.mode = !self.mode;
+
+            #[cfg(feature = "redshift")]
+            {
+                match mode {
+                    0 => {
+                        // turn off redshift
+                        let mut redshift_disable = Command::new("redshift");
+                        redshift_disable.arg("-x");
+                        redshift_disable.spawn()?;
+                    },
+                    1 => {
+                        // turn on redshift
+                        let mut redshift_enable = Command::new("redshift");
+                        redshift_enable.arg("-O");
+                        redshift_enable.arg("1400");
+                        redshift_enable.spawn()?;
+                    },
+                    _ => panic!("Mode is {}!?", mode)
+                };
+            }
+        }
+
+        match brightness {
+            Some(brightness_change) => {
+                self.brightness = match brightness_change {
+                    BrightnessChange::Set(new_brightness) => new_brightness,
+                    BrightnessChange::Adjustment(brightness_shift) => {
+                        cmp::max(cmp::min(brightness_shift + (self.brightness as i8), 100), 0) as u8
+                    }
+                };
+
+                self.create_xrandr_command().spawn()?;
+            },
+            None => ()
+        };
+
+        if configure_display {
+            self.reconfigure_displays()?;
+        }
+
+        Ok(())
+    }
+
     fn reconfigure_displays(&mut self) -> Result<()> {
         let mut displays_file = self.file_utils.get_displays_file()?;
         let new_displays = configure_displays(&mut displays_file)?;
