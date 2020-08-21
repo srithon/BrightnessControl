@@ -1,3 +1,5 @@
+extern crate brightness_control;
+
 use getopts::Options;
 use directories::ProjectDirs;
 
@@ -8,8 +10,7 @@ use std::process::Command;
 
 use std::cmp;
 
-use crate::daemon;
-use crate::client;
+use brightness_control::{daemon, client};
 
 fn get_cli_interface() -> Options {
     let mut options = Options::new();
