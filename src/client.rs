@@ -75,11 +75,11 @@ fn check_brightness(matches: &Matches) -> Result<Option<BrightnessChange>> {
 pub fn handle_input(matches: Matches) -> Result<()> {
     let brightness = check_brightness(&matches)?;
 
-    let program_input = ProgramInput {
+    let program_input = ProgramInput::new(
         brightness,
-        configure_display: matches.opt_present("configure-display"),
-        toggle_nightlight: matches.opt_present("toggle-nightlight")
-    };
+        matches.opt_present("configure-display"),
+        matches.opt_present("toggle-nightlight")
+    );
 
     // SEND INPUT TO DAEMON
 
