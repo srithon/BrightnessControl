@@ -29,6 +29,25 @@ struct FileUtils<'a> {
     file_open_options: OpenOptions,
 }
 
+impl<'a> FileUtils<'a> {
+    fn open_cache_file(&self, file_name: &str) -> Result<File> {
+        let filepath = self.cache_directory.join(file_name);
+        self.file_open_options.open(filepath)
+    }
+
+    fn get_mode_file(&self) -> Result<File> {
+        self.open_cache_file("mode")
+    }
+
+    fn get_brightness_file(&self) -> Result<File> {
+        self.open_cache_file("brightness")
+    }
+
+    fn get_displays_file(&self) -> Result<File> {
+        self.open_cache_file("displays")
+    }
+}
+
 struct Daemon<'a> {
     brightness: u8,
     mode: u8,
@@ -51,28 +70,11 @@ impl<'a> Daemon<'a> {
         }
     }
 
-    fn open_cache_file(&self, file_name: &str) -> Result<File> {
-        let filepath = self.file_utils.cache_directory.join(file_name);
-        self.file_utils.file_open_options.open(filepath)
-    }
-
-    fn get_mode_file(&self) -> Result<File> {
-        self.open_cache_file("mode")
-    }
-
-    fn get_brightness_file(&self) -> Result<File> {
-        self.open_cache_file("brightness")
-    }
-
-    fn get_displays_file(&self) -> Result<File> {
-        self.open_cache_file("displays")
-    }
-
     // 0 for regular
     // 1 for night light
     // gets the mode written to disk; if invalid, writes a default and returns it
-    fn get_written_mode(&self) -> Result<u8> {
-        let mut mode_file = self.get_mode_file()?;
+    pub fn get_written_mode(&self) -> Result<u8> {
+        let mut mode_file = self.file_utils.get_mode_file()?;
         mode_file.set_len(1)?;
 
         get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
@@ -88,8 +90,8 @@ impl<'a> Daemon<'a> {
     }
 
     // loads displays in `displays` or writes down the real values
-    fn get_written_displays(&self) -> Result<Vec<String>> {
-        let mut displays_file = self.get_displays_file()?;
+    pub fn get_written_displays(&self) -> Result<Vec<String>> {
+        let mut displays_file = self.file_utils.get_displays_file()?;
 
         let buffered_display_file_reader = BufReader::new(&mut displays_file);
         // filter out all invalid lines and then collect them into a Vec<String>
@@ -103,8 +105,8 @@ impl<'a> Daemon<'a> {
         }
     }
 
-    fn get_written_brightness(&self) -> Result<u8> {
-        let mut brightness_file = self.get_brightness_file()?;
+    pub fn get_written_brightness(&self) -> Result<u8> {
+        let mut brightness_file = self.file_utils.get_brightness_file()?;
 
         get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
             // need to trim this because the newline character breaks the parse
@@ -119,7 +121,7 @@ impl<'a> Daemon<'a> {
         }, 100)
     }
 
-    fn create_xrandr_command(&self) -> Command {
+    pub fn create_xrandr_command(&self) -> Command {
         let mut xrandr_call = Command::new("xrandr");
 
         for display in &self.displays {
