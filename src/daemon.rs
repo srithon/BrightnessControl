@@ -68,6 +68,25 @@ impl Daemon {
         self.open_cache_file("displays")
     }
 
+    // 0 for regular
+    // 1 for night light
+    // gets the mode written to disk; if invalid, writes a default and returns it
+    fn get_written_mode(&self) -> Result<u8> {
+        let mode_file = self.get_mode_file();
+        mode_file.set_len(1)?;
+
+        get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
+            if let Ok(num) = data_in_file.parse::<u8>() {
+                if num == 0 || num == 1 {
+                    return Ok(Valid(num));
+                }
+            }
+
+            return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
+
+        }, 0)
+    }
+
     fn get_written_displays(&self) -> Result<Vec<String>> {
         let displays_file = self.get_displays_file();
 
@@ -141,76 +160,6 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
     }
 
     Ok(project_directory)
-}
-
-// 0 for regular
-// 1 for night light
-fn get_mode(program_state: &ProgramState) -> Result<u8> {
-    let mode_filepath = program_state.cache_directory.join("mode");
-
-    let mut mode_file = program_state.file_open_options.open(mode_filepath)?;
-    mode_file.set_len(1)?;
-
-    let toggled_mode: Option<u8> = {
-        if program_state.program_input.toggle_nightlight {
-            Some((|| -> Result<u8> {
-                // toggle code
-                let mut char_buffer: [u8; 1] = [0; 1];
-
-                mode_file.read_exact(&mut char_buffer)?;
-
-                let new_mode = {
-                    match char_buffer[0] as char {
-                        '0' => 1,
-                        _   => 0
-                    }
-                };
-
-                mode_file.seek(SeekFrom::Start(0))?;
-                write!(mode_file, "{}", new_mode)?;
-                return Ok(new_mode);
-            })()?)
-        }
-        else {
-            None
-        }
-    };
-
-    if let Some(mode) = toggled_mode { 
-        #[cfg(feature = "redshift")]
-        {
-            match mode {
-                0 => {
-                    // turn off redshift
-                    let mut redshift_disable = Command::new("redshift");
-                    redshift_disable.arg("-x");
-                    redshift_disable.spawn()?;
-                },
-                1 => {
-                    // turn on redshift
-                    let mut redshift_enable = Command::new("redshift");
-                    redshift_enable.arg("-O");
-                    redshift_enable.arg("1400");
-                    redshift_enable.spawn()?;
-                },
-                _ => panic!("Mode is {}!?", mode)
-            };
-        }
-
-        Ok(mode)
-    }
-    else {
-        get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
-            if let Ok(num) = data_in_file.parse::<u8>() {
-                if num == 0 || num == 1 {
-                    return Ok(Valid(num));
-                }
-            }
-
-            return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
-
-        }, 0)
-    }
 }
 
 fn get_current_connected_displays() -> Result<Vec<String>> {
