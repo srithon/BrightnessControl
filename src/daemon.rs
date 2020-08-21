@@ -132,6 +132,19 @@ impl<'a> Daemon<'a> {
         )
     }
 
+    fn reconfigure_displays(&mut self) -> Result<()> {
+        let mut displays_file = self.file_utils.get_displays_file()?;
+        let new_displays = configure_displays(&mut displays_file)?;
+
+        // immutable update
+        // self.displays.clear();
+        // self.displays.clone_from(&new_displays);
+
+        // mutable update
+        self.displays = new_displays;
+        Ok(())
+    }
+
     fn create_xrandr_command(&self) -> Command {
         let mut xrandr_call = Command::new("xrandr");
 
