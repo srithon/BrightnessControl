@@ -1,2 +1,2 @@
-mod daemon;
-mod client;
+pub mod daemon;
+pub mod client;
