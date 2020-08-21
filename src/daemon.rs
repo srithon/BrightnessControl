@@ -291,17 +291,10 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
 
 pub fn daemon() -> Result<()> {
     let project_directory = get_project_directory()?;
-    let cache_directory = project_directory.cache_dir();
 
+    let mut daemon = Daemon::new(&project_directory)?;
 
-    let mode = get_mode(&program_state)?;
-    let displays = get_displays(&program_state, false)?;
-    let brightness = get_brightness(&program_state)?;
-
-    let brightness_string = format!("{:.2}", brightness as f32 / 100.0);
-    println!("Brightness: {}", brightness_string);
-
-    let mut xrandr_call = create_xrandr_command(displays, &brightness_string, mode);
+    let mut xrandr_call = daemon.create_xrandr_command();
 
     // this variable is only used if the "auto-reconfigure" feature is enabled
     let mut _call_handle = xrandr_call.spawn()?;
@@ -315,8 +308,8 @@ pub fn daemon() -> Result<()> {
         if !exit_status.success() {
             println!("Reconfiguring!");
             // force reconfigure
-            let displays = get_displays(&program_state, true)?;
-            create_xrandr_command(displays, &brightness_string, mode).spawn()?;
+            daemon.reconfigure_displays()?;
+            daemon.create_xrandr_command()?.spawn()?;
         }
     }
 
