@@ -214,7 +214,7 @@ fn get_current_connected_displays() -> Result<Vec<String>> {
         line_as_string[0..line_as_string.find(' ').unwrap()].to_owned()
     }).collect();
 
-    connected_displays
+    Ok(connected_displays)
 }
 
 fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
