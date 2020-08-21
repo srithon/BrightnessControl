@@ -24,6 +24,16 @@ pub struct ProgramInput {
     toggle_nightlight: bool
 }
 
+impl ProgramInput {
+    pub fn new(brightness: Option<BrightnessChange>, configure_display: bool, toggle_nightlight: bool) -> ProgramInput {
+        ProgramInput {
+            brightness,
+            configure_display,
+            toggle_nightlight
+        }
+    }
+}
+
 struct FileUtils<'a> {
     cache_directory: &'a std::path::Path,
     file_open_options: OpenOptions,
