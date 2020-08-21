@@ -87,6 +87,7 @@ impl Daemon {
         }, 0)
     }
 
+    // loads displays in `displays` or writes down the real values
     fn get_written_displays(&self) -> Result<Vec<String>> {
         let displays_file = self.get_displays_file();
 
@@ -94,8 +95,14 @@ impl Daemon {
         // filter out all invalid lines and then collect them into a Vec<String>
         let read_displays = buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>();
 
-        Ok(read_displays)
+        if read_displays.len() > 0 {
+            Ok(read_displays)
+        }
+        else {
+            configure_displays(&mut displays_file)
+        }
     }
+
 }
 
 use DataValidatorResult::*;
