@@ -153,8 +153,10 @@ impl<'a> Daemon<'a> {
             xrandr_call.arg(display);
         }
 
+        let brightness_string = format!("{:.2}", *(&self.brightness) as f32 / 100.0);
+
         xrandr_call.arg("--brightness")
-            .arg(&self.brightness.to_string());
+            .arg(brightness_string);
 
         #[cfg(not(feature = "redshift"))]
         {
