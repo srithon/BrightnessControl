@@ -129,6 +129,23 @@ impl<'a> FileUtils<'a> {
         }, 100)
     }
 
+    fn write_brightness(&self, brightness: u8) -> Result<()> {
+        let mut brightness_file = self.get_brightness_file()?;
+        overwrite_file_with_content(&mut brightness_file, brightness)?;
+        Ok(())
+    }
+
+    fn write_mode(&self, mode: bool) -> Result<()> {
+        let mut mode_file = self.get_mode_file()?;
+        overwrite_file_with_content(&mut mode_file, mode)?;
+        Ok(())
+    }
+
+    fn write_displays(&self, displays: &Vec<String>) -> Result<()> {
+        let mut displays_file = self.get_displays_file()?;
+        write_specified_displays_to_file(&mut displays_file, displays)?;
+        Ok(())
+    }
 }
 
 struct Daemon<'a> {
@@ -236,6 +253,13 @@ impl<'a> Daemon<'a> {
                 }
             }
         }
+        Ok(())
+    }
+
+    fn save_configuration(&self) -> Result<()> {
+        self.file_utils.write_mode(self.mode)?;
+        self.file_utils.write_brightness(self.brightness)?;
+        self.file_utils.write_displays(&self.displays)?;
         Ok(())
     }
 
@@ -357,6 +381,20 @@ impl<'a> Daemon<'a> {
 
 use DataValidatorResult::*;
 
+fn overwrite_file_with_content<T>(file: &mut File, new_content: T) -> Result<()>
+where T: Display {
+    file.seek(std::io::SeekFrom::Start(0))?;
+
+    let formatted_new_content = format!("{}", new_content);
+
+    // <<NOTE>> this can overflow? len() returns a usize
+    file.set_len(formatted_new_content.len() as u64)?;
+
+    write!(file, "{}", formatted_new_content)?;
+
+    Ok(())
+}
+
 // where ....
 fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<DataValidatorResult<T>>, default_value: T) -> Result<T>
 where T: Display {
@@ -381,7 +419,6 @@ where T: Display {
         Ok(contents)
     }
     else {
-        file.seek(std::io::SeekFrom::Start(0))?;
         let new_value = {
             if let Ok(Changed(new_value)) = file_contents {
                 new_value
@@ -391,11 +428,8 @@ where T: Display {
             }
         };
 
-        let formatted_new_value = format!("{}", new_value);
-        // <<NOTE>> this can overflow? len() returns a usize
-        file.set_len(formatted_new_value.len() as u64)?;
+        overwrite_file_with_content(file, new_value)?;
 
-        write!(file, "{}", formatted_new_value)?;
         Ok(new_value)
     }
 }
@@ -452,9 +486,7 @@ fn get_current_connected_displays() -> Result<Vec<String>> {
     Ok(connected_displays)
 }
 
-fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
-    let connected_displays = get_current_connected_displays()?;
-
+fn write_specified_displays_to_file(displays_file: &mut std::fs::File, connected_displays: &Vec<String>) -> Result<()> {
     // sum the lengths of each display name, and then add (number of names - 1) to account
     // for newline separators between each name
     // subtract 1 because there is no newline at the end
@@ -469,6 +501,14 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
     // the above loop appends a newline to each display, including the last one
     // however, this call to set_len() cuts out this final newline
     displays_file.set_len(displays_file_length as u64)?;
+
+    Ok(())
+}
+
+fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
+    let connected_displays = get_current_connected_displays()?;
+
+    write_specified_displays_to_file(displays_file, &connected_displays);
 
     Ok(connected_displays)
 }
