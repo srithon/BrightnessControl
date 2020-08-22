@@ -1,4 +1,4 @@
-use getopts::Options;
+use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
 use std::fs::{self, File, OpenOptions};
@@ -7,6 +7,12 @@ use std::fmt::Display;
 use std::process::Command;
 
 use std::cmp;
+
+pub fn get_bincode_options() -> DefaultOptions {
+    let options = bincode::DefaultOptions::default();
+    options.with_fixint_encoding();
+    options
+}
 
 enum DataValidatorResult<T> {
     Valid(T),
