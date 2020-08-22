@@ -24,13 +24,13 @@ enum DataValidatorResult<T> {
     Changed(T),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum BrightnessChange {
     Adjustment(i8),
     Set(u8)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
     configure_display: bool,
