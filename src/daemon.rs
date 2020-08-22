@@ -521,11 +521,62 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
     Ok(connected_displays)
 }
 
+fn register_sigterm_handler() -> Result<()> {
+    unsafe {
+        signal_hook::register(signal_hook::SIGTERM, move || {
+            // signal_hook 
+            std::thread::spawn(|| {
+                // SEND INPUT TO DAEMON
+                match UnixStream::connect(SOCKET_PATH) {
+                    Ok(mut sock) => {
+                        let mock_save_daemon_input = ProgramInput {
+                            brightness: None,
+                            toggle_nightlight: false,
+                            configure_display: false,
+                            save_configuration: true
+                        };
+
+                        let bincode_options = get_bincode_options();
+                        if let Ok(binary_encoded_input) = bincode_options.serialize(&mock_save_daemon_input) {
+                            let write_result = sock.write_all(&binary_encoded_input);
+                            match write_result {
+                                Ok(_) => {
+                                    println!("Successfully wrote save command to socket");
+                                },
+                                Err(e) => {
+                                    eprintln!("Failed to write save command to socket: {}", e);
+                                }
+                            }
+                        }
+
+                        let _ = sock.shutdown(std::net::Shutdown::Both);
+
+                        // wait 1 second for it to finish
+                        let one_second = std::time::Duration::from_millis(1000);
+                        std::thread::sleep(one_second);
+                    },
+                    Err(e) => {
+                        eprintln!("Couldn't connect: {:?}", e);
+                    }
+                };
+
+                let _ = std::fs::remove_file(SOCKET_PATH);
+
+                std::process::abort()
+            });
+        })
+    }?;
+
+    Ok(())
+}
+
 pub fn daemon() -> Result<()> {
     let project_directory = get_project_directory()?;
 
     let mut daemon = Daemon::new(&project_directory)?;
     daemon.refresh_configuration()?;
+
+    register_sigterm_handler()?;
 
     // enters the daemon event loop
     // (blocking)
