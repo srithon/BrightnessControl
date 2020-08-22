@@ -177,7 +177,14 @@ impl<'a> Daemon<'a> {
             }
         }
 
-        let listener = UnixListener::bind(SOCKET_PATH)?;
+        let listener = match UnixListener::bind(SOCKET_PATH) {
+            Ok(listener) => listener,
+            Err(e) => {
+                eprintln!("Error binding listener: {}", e);
+                std::fs::remove_file(SOCKET_PATH)?;
+                UnixListener::bind(SOCKET_PATH)?
+            }
+        };
 
         let bincode_options = get_bincode_options();
 
