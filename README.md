@@ -2,8 +2,6 @@
 
 ## Disclaimer: Linux + Xorg Only
 
-## THIS BRANCH IS CURRENTLY IN DEVELOPMENT
-
 `BrightnessControl` is a wrapper around `xrandr` that allows for easy adjustments of brightness.
 
 This brightness is separate from the backlight.
@@ -12,57 +10,41 @@ It also allows for an emulation of a blue light filter / night light, which can 
 
 To use `redshift` instead of `xrandr` for the blue light filter, pass in the `redshift` feature during installation. Details on how to do this will be in the `Installation` section
 
-Internally, the brightness is stored in `~/.cache/brightnesscontrol/brightness`
+***
 
-It is a number between 0 and 100 (inclusive) which represents the current brightness relative to max brightness
+Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
 
-The mode (nightlight or normal) is stored in `~/.cache/brightnesscontrol/mode`
+When the daemon is started, it loads the following values from disk
+* brightness: [0..100] percentage of full brightness
+  * stored in `~/.cache/brightnesscontrol/brightness`
+* mode: 0 or 1; 0 means nightlight is off, 1 means it is on
+  * stored in `~/.cache/brightnesscontrol/mode`
+* displays: list of connected display adapters
+  * stored in `~/.cache/brightnesscontrol/displays`
 
-It is either `0` or `1`
+If the contents of either `brightness` or `mode` are invalid, they are automatically defaulted and overwritten
 
-`0`: nightlight is off
+If the `displays` file is empty or non-existent, it will automatically be populated with the current display configuration
 
-`1`: nightlight is on
+After starting, the daemon stores all of these values in memory, and does not touch the files again until it receives a `SIGTERM` signal.
 
-If the file contents are invalid, they are automatically defaulted and overwritten for both `brightness` and `mode`
+Upon receiving this signal, the daemon writes all of the new values to the filesystem and terminates.
 
-The displays that BrightnessControl will supply to its `xrandr` calls are stored in `~/.cache/brightnesscontrol/displays`
+Manually modifying these files while the daemon is running will have no effect.
 
-If the executable is called and the `displays` file is empty or non-existent, it will automatically populate the file with the current display configuration
+***
 
-If the `xrandr` call *fails* as a result of invalid/outdated data in the cache, the program will automatically reconfigure the display **IF** the `auto-reconfigure` feature is enabled at compile-time.
+If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically reconfigure its list of displays **IF** the `auto-reconfigure` feature is enabled at compile-time.
 
-When this feature is not enabled, the program takes less time to run because it does not have to wait for the `xrandr` call to terminate before terminating itself
+When this feature is not enabled, each individual client message takes less time to process because the daemon does not have to wait for each `xrandr` call to terminate before moving onto the next one
 
-However, the runtime difference will be negligible for most users.
+The `xrandr` call will only fail if a display is *disconnected*, so even with `auto-reconfigure` enabled, the daemon will not automatically reconfigure when a new monitor is connected.
 
-The following benchmarks were run using [hyperfine](https://github.com/sharkdp/hyperfine)
+For users that often disconnect and reconnect monitors, the [srandrd](https://github.com/jceb/srandrd) tool can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
 
-**With auto-reconfigure enabled**
-```
-Benchmark #0: ~/.local/bin/brightness_control --increment 1
-  Time (mean ± σ):      26.0 ms ±   8.7 ms    [User: 5.9 ms, System: 5.7 ms]
-  Range (min … max):     7.9 ms …  43.8 ms    90 runs
-```
-
-**Without auto-reconfigure enabled**
-```
-Benchmark #1: ~/.local/bin/brightness_control --increment 1
-  Time (mean ± σ):       0.2 ms ±   0.4 ms    [User: 0.4 ms, System: 0.7 ms]
-  Range (min … max):     0.0 ms …   2.4 ms    90 runs
-```
+This is a good alternative to the `auto-reconfigure` feature, which also has the advantage of working when a new monitor is connected
 
 Instructions on how to enable/disable this feature are in the Installation section
-
-_General Notes_
-* If you modify any of these files from outside the program, run the executable with no arguments to make the changes active
-* All 3 of these files are automatically created and populated if they do not exist
-  * if `brightness` or `mode` contain invalid data, they will be defaulted and overwritten
-  * if `displays` contains invalid data and causes the `xrandr` call to fail, it will be overwritten if the `auto-reconfigure` feature is enabled
-    * this can happen if an adapter is disconnected after the configuration is made
-      * **however, if the reverse happens and a display is added after the configuration is made, auto-reconfigure will not reconfigure**
-        * instructions on how to manually reconfigure are in the `Usage` section
-    * this feature may be useful for you if you change your display configuration often
 
 ## Installation
 *From the project root*
@@ -91,8 +73,6 @@ cargo install --features "[auto-reconfigure] [redshift]" --path . --root ~/.loca
 
 `cargo` will append `bin/` to the end of the path that you pass in for `--root`, so the above command will install the executable into `~/.local/bin/`
 
-This is because `brightness_control.rs` is inside of a `bin` subdirectory
-
 ### Configuring Redshift
 *Change redshift's adjustment mode*
 ```
@@ -102,9 +82,17 @@ sed -i 's/adjustment-method=randr/adjustment-method=vidmode' ~/.config/redshift.
 ## Usage
 *All examples assume that the name of the executable is `brightness_control` and that the executable can be found in one of the directories in the `PATH` environmental variable*
 
+All brightness_control options have shorthands. For most of them, the first letter of the option's name acts as the shorthand. However, "daemon" and "decrement" both start with 'd'; "decrement" came first, so "daemon"'s shorthand is "-b"
+
+When using shorthands, the separating space between an option and its value may be omitted. This is shown in the first example, and can be applied to any option that takes a value
+
 *To Reduce the Brightness by 10%*
 ```
 brightness_control --decrement 10
+```
+or
+```
+brightness_control -d10
 ```
 
 *To Increase the Brightness by 10%*
@@ -132,6 +120,11 @@ brightness_control --toggle-nightlight
 This is necessary when a new display adapter is connected
 ```
 brightness_control --configure-display
+```
+
+*To Start the Daemon*
+```
+brightness_control --daemon
 ```
 
 *To View the Help Menu*
