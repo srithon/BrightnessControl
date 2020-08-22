@@ -1,6 +1,9 @@
 use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
+#[macro_use]
+use serde::{Serialize, Deserialize};
+
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
 use std::fmt::Display;
@@ -19,11 +22,13 @@ enum DataValidatorResult<T> {
     Changed(T),
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum BrightnessChange {
     Adjustment(i8),
     Set(u8)
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
     configure_display: bool,
