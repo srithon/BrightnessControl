@@ -89,8 +89,10 @@ pub fn handle_input(matches: Matches) -> Result<()> {
     let mut socket = match UnixStream::connect(SOCKET_PATH) {
         Ok(sock) => sock,
         Err(e) => {
-            println!("Couldn't connect: {:?}", e);
-            return Err(e);
+            eprintln!("Couldn't connect to socket.");
+            eprintln!("Start the daemon with the \"--daemon\" option, and then try again");
+            eprintln!("If the daemon is already running, terminate it with \"killall brightness_control\" and then relaunch it");
+            std::process::exit(1);
         }
     };
 
