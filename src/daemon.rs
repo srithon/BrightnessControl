@@ -4,6 +4,8 @@ use directories::ProjectDirs;
 #[macro_use]
 use serde::{Serialize, Deserialize};
 
+use std::os::unix::net::{UnixStream, UnixListener};
+
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
 use std::fmt::Display;
@@ -153,6 +155,41 @@ impl<'a> Daemon<'a> {
                 file_utils
             }
         )
+    }
+
+    fn run(&mut self) -> Result<()> {
+        let listener = UnixListener::bind(SOCKET_PATH)?;
+
+        let bincode_options = get_bincode_options();
+
+        println!("Brightness: {}", self.brightness);
+        println!("Mode: {}", self.mode);
+        println!("Displays: {:?}", self.displays);
+
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => {
+                    let stream = BufReader::new(stream);
+                    // Rust is amazing
+                    // the compiler figured out the type of program_input based on the call to
+                    // self.process_input 5 lines below
+                    let program_input = bincode_options.deserialize_from(stream);
+                    match program_input {
+                        Ok(program_input) => {
+                            println!("Deserialized ProgramInput: {:?}", program_input);
+                            self.process_input(program_input)?;
+                        },
+                        Err(err) => {
+                            eprintln!("Error deserializing: {}", err);
+                        }
+                    }
+                }
+                Err(err) => {
+                    break;
+                }
+            }
+        }
+        Ok(())
     }
 
     // pass in blank input to process_input to refresh
