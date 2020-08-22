@@ -1,3 +1,4 @@
+use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
@@ -158,6 +159,23 @@ impl<'a> Daemon<'a> {
     }
 
     fn run(&mut self) -> Result<()> {
+        let pid_file_path = self.file_utils.cache_directory.join("daemon.pid");
+        let stdout = self.file_utils.open_cache_file("daemon_stdout.out")?;
+        let stderr = self.file_utils.open_cache_file("daemon_stderr.err")?;
+
+        let daemonize = Daemonize::new()
+            .pid_file(pid_file_path)
+            .working_directory(&self.file_utils.cache_directory)
+            .stdout(stdout)
+            .stderr(stderr);
+
+        match daemonize.start() {
+            Ok(_) => println!("Success, daemonized"),
+            Err(e) => {
+                return Err(Error::new(ErrorKind::Other, format!("Failed to daemonize: {}", e)));
+            }
+        }
+
         let listener = UnixListener::bind(SOCKET_PATH)?;
 
         let bincode_options = get_bincode_options();
