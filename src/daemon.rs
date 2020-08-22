@@ -233,7 +233,7 @@ impl<'a> Daemon<'a> {
 
             #[cfg(feature = "redshift")]
             {
-                match mode {
+                match &self.mode {
                     0 => {
                         // turn off redshift
                         let mut redshift_disable = Command::new("redshift");
@@ -247,7 +247,7 @@ impl<'a> Daemon<'a> {
                         redshift_enable.arg("1400");
                         redshift_enable.spawn()?;
                     },
-                    _ => panic!("Mode is {}!?", mode)
+                    _ => panic!("Mode is {}!?", &self.mode)
                 };
             }
         }
