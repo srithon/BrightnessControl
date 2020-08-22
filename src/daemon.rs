@@ -11,6 +11,8 @@ use std::process::Command;
 
 use std::cmp;
 
+pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
+
 pub fn get_bincode_options() -> DefaultOptions {
     let options = bincode::DefaultOptions::default();
     options.with_fixint_encoding();
