@@ -315,7 +315,7 @@ impl<'a> Daemon<'a> {
                     }
                 };
 
-                let _call_handle = self.create_xrandr_command().spawn()?;
+                let mut _call_handle = self.create_xrandr_command().spawn()?;
 
                 #[cfg(feature = "auto-reconfigure")]
                 {
@@ -327,7 +327,7 @@ impl<'a> Daemon<'a> {
                         println!("Reconfiguring!");
                         // force reconfigure
                         self.reconfigure_displays()?;
-                        self.create_xrandr_command()?.spawn()?;
+                        self.create_xrandr_command().spawn()?;
 
                         // if configure_display is true, dont want to reconfigure again
                         // instead of branching, just return early regardless
