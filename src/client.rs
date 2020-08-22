@@ -1,3 +1,4 @@
+use bincode::Options as BincodeOptions;
 use getopts::{Options, Matches};
 use directories::ProjectDirs;
 
@@ -5,6 +6,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
 use std::fmt::Display;
 use std::process::Command;
+
+use std::os::unix::net::UnixStream;
 
 use std::cmp;
 
@@ -82,6 +85,20 @@ pub fn handle_input(matches: Matches) -> Result<()> {
     );
 
     // SEND INPUT TO DAEMON
+    let mut socket = match UnixStream::connect(SOCKET_PATH) {
+        Ok(sock) => sock,
+        Err(e) => {
+            println!("Couldn't connect: {:?}", e);
+            return Err(e);
+        }
+    };
+
+    let bincode_options = get_bincode_options();
+    let binary_encoded_input = bincode_options.serialize(&program_input).unwrap();
+
+    socket.write_all(&binary_encoded_input)?;
+
+    socket.shutdown(std::net::Shutdown::Both)?;
 
     // IF DAEMON IS NOT RUNNING, THROW ERROR
 
