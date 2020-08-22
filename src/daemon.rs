@@ -37,15 +37,17 @@ pub enum BrightnessChange {
 pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
     configure_display: bool,
-    toggle_nightlight: bool
+    toggle_nightlight: bool,
+    save_configuration: bool
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessChange>, configure_display: bool, toggle_nightlight: bool) -> ProgramInput {
+    pub fn new(brightness: Option<BrightnessChange>, configure_display: bool, toggle_nightlight: bool, save_configuration: bool) -> ProgramInput {
         ProgramInput {
             brightness,
             configure_display,
-            toggle_nightlight
+            toggle_nightlight,
+            save_configuration
         }
     }
 }
@@ -268,7 +270,8 @@ impl<'a> Daemon<'a> {
         let blank_input = ProgramInput {
             brightness: None,
             toggle_nightlight: false,
-            configure_display: false
+            configure_display: false,
+            save_configuration: false
         };
 
         self.process_input(blank_input)
@@ -280,6 +283,7 @@ impl<'a> Daemon<'a> {
         let brightness = program_input.brightness;
         let toggle_nightlight = program_input.toggle_nightlight;
         let configure_display = program_input.configure_display;
+        let save_configuration = program_input.save_configuration;
 
         if toggle_nightlight {
             self.mode = !self.mode;
@@ -336,6 +340,10 @@ impl<'a> Daemon<'a> {
 
         if configure_display {
             self.reconfigure_displays()?;
+        }
+
+        if save_configuration {
+            self.save_configuration()?;
         }
 
         Ok(())

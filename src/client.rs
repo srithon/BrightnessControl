@@ -81,7 +81,8 @@ pub fn handle_input(matches: Matches) -> Result<()> {
     let program_input = ProgramInput::new(
         brightness,
         matches.opt_present("configure-display"),
-        matches.opt_present("toggle-nightlight")
+        matches.opt_present("toggle-nightlight"),
+        false
     );
 
     // SEND INPUT TO DAEMON
