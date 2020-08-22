@@ -436,7 +436,7 @@ where T: Display {
             }
         };
 
-        overwrite_file_with_content(file, new_value)?;
+        overwrite_file_with_content(file, &new_value)?;
 
         Ok(new_value)
     }
@@ -516,7 +516,7 @@ fn write_specified_displays_to_file(displays_file: &mut std::fs::File, connected
 fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
     let connected_displays = get_current_connected_displays()?;
 
-    write_specified_displays_to_file(displays_file, &connected_displays);
+    write_specified_displays_to_file(displays_file, &connected_displays)?;
 
     Ok(connected_displays)
 }
