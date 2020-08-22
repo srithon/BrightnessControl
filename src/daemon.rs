@@ -173,7 +173,16 @@ impl<'a> Daemon<'a> {
         match daemonize.start() {
             Ok(_) => println!("Success, daemonized"),
             Err(e) => {
-                return Err(Error::new(ErrorKind::Other, format!("Failed to daemonize: {}", e)));
+                let stringified_error = e.to_string();
+
+                if stringified_error.contains("unable to lock pid file") {
+                    eprintln!("Daemon is already running!");
+                    eprintln!("To restart, run \"killall brightness_control\" before relaunching the daemon");
+                    // explicit exit to prevent the raw error from being printed
+                    std::process::exit(1);
+                }
+
+                return Err(Error::new(ErrorKind::Other, format!("Failed to daemonize: {}", stringified_error)));
             }
         }
 
