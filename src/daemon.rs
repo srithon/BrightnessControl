@@ -2,7 +2,6 @@ use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
-#[macro_use]
 use serde::{Serialize, Deserialize};
 
 use std::os::unix::net::{UnixStream, UnixListener};
@@ -122,7 +121,7 @@ impl<'a> FileUtils<'a> {
             // need to trim this because the newline character breaks the parse
             if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
                 // check bounds
-                if num <= 100 && num >= 0 {
+                if num <= 100 {
                     return Ok(Valid(num));
                 }
             }
@@ -250,7 +249,7 @@ impl<'a> Daemon<'a> {
                         }
                     }
                 }
-                Err(err) => {
+                Err(_) => {
                     break;
                 }
             }

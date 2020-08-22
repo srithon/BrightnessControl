@@ -82,7 +82,7 @@ pub fn handle_input(matches: Matches) -> Result<()> {
     // SEND INPUT TO DAEMON
     let mut socket = match UnixStream::connect(SOCKET_PATH) {
         Ok(sock) => sock,
-        Err(e) => {
+        Err(_) => {
             eprintln!("Couldn't connect to socket.");
             eprintln!("Start the daemon with the \"--daemon\" option, and then try again");
             eprintln!("If the daemon is already running, terminate it with \"killall brightness_control\" and then relaunch it");
