@@ -76,20 +76,21 @@ impl<'a> FileUtils<'a> {
     // 0 for regular
     // 1 for night light
     // gets the mode written to disk; if invalid, writes a default and returns it
-    fn get_written_mode(&self) -> Result<u8> {
+    fn get_written_mode(&self) -> Result<bool> {
         let mut mode_file = self.get_mode_file()?;
         mode_file.set_len(1)?;
 
         get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
             if let Ok(num) = data_in_file.parse::<u8>() {
                 if num == 0 || num == 1 {
-                    return Ok(Valid(num));
+                    // cannot cast "num as bool" normally
+                    return Ok(Valid(num != 0));
                 }
             }
 
             return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
 
-        }, 0)
+        }, false)
     }
 
     // loads displays in `displays` or writes down the real values
@@ -128,7 +129,7 @@ impl<'a> FileUtils<'a> {
 
 struct Daemon<'a> {
     brightness: u8,
-    mode: u8,
+    mode: bool,
     displays: Vec<String>,
     file_utils: FileUtils<'a>
 }
@@ -233,22 +234,19 @@ impl<'a> Daemon<'a> {
 
             #[cfg(feature = "redshift")]
             {
-                match &self.mode {
-                    0 => {
-                        // turn off redshift
-                        let mut redshift_disable = Command::new("redshift");
-                        redshift_disable.arg("-x");
-                        redshift_disable.spawn()?;
-                    },
-                    1 => {
-                        // turn on redshift
-                        let mut redshift_enable = Command::new("redshift");
-                        redshift_enable.arg("-O");
-                        redshift_enable.arg("1400");
-                        redshift_enable.spawn()?;
-                    },
-                    _ => panic!("Mode is {}!?", &self.mode)
-                };
+                if self.mode {
+                    // turn on redshift
+                    let mut redshift_enable = Command::new("redshift");
+                    redshift_enable.arg("-O");
+                    redshift_enable.arg("1400");
+                    redshift_enable.spawn()?;
+                }
+                else {
+                    // turn off redshift
+                    let mut redshift_disable = Command::new("redshift");
+                    redshift_disable.arg("-x");
+                    redshift_disable.spawn()?;
+                }
             }
         }
 
@@ -319,7 +317,7 @@ impl<'a> Daemon<'a> {
 
         #[cfg(not(feature = "redshift"))]
         {
-            if *(&self.mode) == 1 {
+            if self.mode {
                 xrandr_call.arg("--gamma")
                     .arg("1.0:0.7:0.45");
             }
@@ -446,7 +444,6 @@ fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> 
 
     Ok(connected_displays)
 }
-
 
 pub fn daemon() -> Result<()> {
     let project_directory = get_project_directory()?;
