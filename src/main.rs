@@ -17,6 +17,7 @@ fn get_cli_interface() -> Options {
     options
         .parsing_style(getopts::ParsingStyle::FloatingFrees)
         .optflag("h", "help", "Prints the help menu")
+        .optflag("v", "version", "Prints the current version of BrightnessControl")
         // b for BrightnessControl
         // already used 'd' for decrement and I didnt want to replace increment/decrement with 'adjustment'
         .optflag("b", "daemon", "Starts the BrightnessControl daemon")
@@ -29,7 +30,7 @@ fn get_cli_interface() -> Options {
 }
 
 fn print_help(program_invocation_name: &str, cli: &Options) {
-    let brief = format!("Usage: {} [options]", program_invocation_name);
+    let brief = format!("Usage: {} [options]\nBrightnessControl {}", program_invocation_name, env!("CARGO_PKG_VERSION"));
     print!("{}", cli.usage(&brief));
 }
 
@@ -58,6 +59,9 @@ fn main() -> Result<()> {
 
     if matches.opt_present("help") {
         print_help(&program_invocation_name, &cli);
+    }
+    else if matches.opt_present("version") {
+        println!("BrightnessControl {}", env!("CARGO_PKG_VERSION"));
     }
     else if matches.opt_present("daemon") {
         // CHECK IF DAEMON IS RUNNING
