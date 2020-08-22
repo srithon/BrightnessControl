@@ -88,46 +88,46 @@ When using shorthands, the separating space between an option and its value may 
 
 *To Reduce the Brightness by 10%*
 ```
-brightness_control --decrement 10
+$ brightness_control --decrement 10
 ```
 or
 ```
-brightness_control -d10
+$ brightness_control -d10
 ```
 
 *To Increase the Brightness by 10%*
 ```
-brightness_control --increment 10
+$ brightness_control --increment 10
 ```
 
 *To Set the Brightness to 80%*
 ```
-brightness_control --set 80
+$ brightness_control --set 80
 ```
 
 *To Refresh the Current Brightness*
 ```
-brightness_control
+$ brightness_control
 ```
 
 *To Toggle Night Light*
 ```
-brightness_control --toggle-nightlight
+$ brightness_control --toggle-nightlight
 ```
 
 *To Reconfigure the Cached Display Settings*
 
 This is necessary when a new display adapter is connected
 ```
-brightness_control --configure-display
+$ brightness_control --configure-display
 ```
 
 *To Start the Daemon*
 ```
-brightness_control --daemon
+$ brightness_control --daemon
 ```
 
 *To View the Help Menu*
 ```
-brightness_control --help
+$ brightness_control --help
 ```
