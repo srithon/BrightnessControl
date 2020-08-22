@@ -434,25 +434,11 @@ pub fn daemon() -> Result<()> {
     let project_directory = get_project_directory()?;
 
     let mut daemon = Daemon::new(&project_directory)?;
+    daemon.refresh_configuration()?;
 
-    let mut xrandr_call = daemon.create_xrandr_command();
-
-    // this variable is only used if the "auto-reconfigure" feature is enabled
-    let mut _call_handle = xrandr_call.spawn()?;
-
-    #[cfg(feature = "auto-reconfigure")]
-    {
-        let exit_status = _call_handle.wait()?;
-
-        // if the call fails, then the configuration is no longer valid
-        // reconfigures the display and then tries again
-        if !exit_status.success() {
-            println!("Reconfiguring!");
-            // force reconfigure
-            daemon.reconfigure_displays()?;
-            daemon.create_xrandr_command()?.spawn()?;
-        }
-    }
+    // enters the daemon event loop
+    // (blocking)
+    daemon.run()?;
 
     Ok(())
 }
