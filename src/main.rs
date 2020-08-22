@@ -17,6 +17,9 @@ fn get_cli_interface() -> Options {
     options
         .parsing_style(getopts::ParsingStyle::FloatingFrees)
         .optflag("h", "help", "Prints the help menu")
+        // b for BrightnessControl
+        // already used 'd' for decrement and I didnt want to replace increment/decrement with 'adjustment'
+        .optflag("b", "daemon", "Starts the BrightnessControl daemon")
         .optflag("c", "configure-display", "Uses the current display configuration for future calls to BrightnessControl")
         .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
         .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
@@ -60,11 +63,11 @@ fn main() -> Result<()> {
         // CHECK IF DAEMON IS RUNNING
 
         // START DAEMON
-        daemon::daemon();
+        daemon::daemon()?;
     }
     else {
         // RUN CLIENT CODE
-        client::handle_input(matches);
+        client::handle_input(matches)?;
     }
 
     Ok(())
