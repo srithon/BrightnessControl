@@ -134,12 +134,20 @@ $ brightness_control --help
 
 ## Keybinding
 All of these commands can be bound to keybindings for ease-of-use.
+
 In the future, this functionality may be integrated directly into the application, but for now this can be done with [xbindkeys](https://wiki.archlinux.org/index.php/Xbindkeys) or other similar utilities.
 
 An example schema is below
+
 Alt+PgUp        -> `brightness_control -i10`
+
 Alt+PgDown      -> `brightness_control -d10`
+
 Alt+Ctrl+PgUp   -> `brightness_control -i2`
+
 Alt+Ctrl+PgDown -> `brightness_control -d2`
+
 Alt+End         -> `brightness_control -t`
+
 Alt+Home        -> `brightness_control -c`
+
