@@ -1,14 +1,8 @@
 extern crate brightness_control;
 
 use getopts::Options;
-use directories::ProjectDirs;
 
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
-use std::fmt::Display;
-use std::process::Command;
-
-use std::cmp;
+use std::io::Result;
 
 use brightness_control::{daemon, client};
 

@@ -1,15 +1,9 @@
 use bincode::Options as BincodeOptions;
-use getopts::{Options, Matches};
-use directories::ProjectDirs;
+use getopts::Matches;
 
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
-use std::fmt::Display;
-use std::process::Command;
+use std::io::{Error, ErrorKind, Write, Result};
 
 use std::os::unix::net::UnixStream;
-
-use std::cmp;
 
 use crate::daemon::*;
 

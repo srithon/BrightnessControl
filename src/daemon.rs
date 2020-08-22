@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 use std::os::unix::net::{UnixStream, UnixListener};
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, SeekFrom, Write, Read, Result};
+use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, Write, Read, Result};
 use std::fmt::Display;
 use std::process::Command;
 
