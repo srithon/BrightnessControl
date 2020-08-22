@@ -56,9 +56,13 @@ struct FileUtils<'a> {
 }
 
 impl<'a> FileUtils<'a> {
-    fn open_cache_file(&self, file_name: &str) -> Result<File> {
+    fn open_cache_file_with_options(&self, file_name: &str, open_options: &OpenOptions) -> Result<File> {
         let filepath = self.cache_directory.join(file_name);
-        self.file_open_options.open(filepath)
+        open_options.open(filepath)
+    }
+
+    fn open_cache_file(&self, file_name: &str) -> Result<File> {
+        self.open_cache_file_with_options(file_name, &self.file_open_options)
     }
 
     fn get_mode_file(&self) -> Result<File> {
@@ -161,8 +165,16 @@ impl<'a> Daemon<'a> {
 
     fn run(&mut self) -> Result<()> {
         let pid_file_path = self.file_utils.cache_directory.join("daemon.pid");
-        let stdout = self.file_utils.open_cache_file("daemon_stdout.out")?;
-        let stderr = self.file_utils.open_cache_file("daemon_stderr.err")?;
+        let (stdout, stderr) = {
+            let mut log_file_open_options = OpenOptions::new();
+            log_file_open_options.create(true);
+            log_file_open_options.append(true);
+
+            let stdout = self.file_utils.open_cache_file_with_options("daemon_stdout.out", &log_file_open_options)?;
+            let stderr = self.file_utils.open_cache_file_with_options("daemon_stderr.err", &log_file_open_options)?;
+
+            (stdout, stderr)
+        };
 
         let daemonize = Daemonize::new()
             .pid_file(pid_file_path)
