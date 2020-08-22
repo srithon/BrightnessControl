@@ -64,8 +64,6 @@ fn main() -> Result<()> {
         println!("BrightnessControl {}", env!("CARGO_PKG_VERSION"));
     }
     else if matches.opt_present("daemon") {
-        // CHECK IF DAEMON IS RUNNING
-
         // START DAEMON
         daemon::daemon()?;
     }
