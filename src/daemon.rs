@@ -170,9 +170,11 @@ impl DaemonOptions {
     }
 }
 
+struct Daemon {
     brightness: u8,
     mode: bool,
     displays: Vec<String>,
+    config: DaemonOptions,
     file_utils: FileUtils
 }
 
@@ -191,11 +193,47 @@ impl Daemon {
             file_open_options
         };
 
+        let config: DaemonOptions = {
+            let configuration: DaemonOptions = (|| {
+                let (mut config_file, file_existed) = file_utils.open_configuration_file()?;
+
+                // file exists
+                if file_existed {
+                    let buffered_reader = BufReader::new(&mut config_file);
+                    if let Ok(config) = toml::from_slice(buffered_reader.buffer()) {
+                        return Ok(config);
+                    }
+                }
+                else {
+                    // write defaults to config file
+                    let defaults = DaemonOptions::default();
+                    let serialized_defaults = match toml::to_string_pretty(&defaults) {
+                        Ok(serialized_defaults) => serialized_defaults,
+                        Err(error) => {
+                            return Err(Error::new(ErrorKind::InvalidData, format!("{}", error)));
+                        }
+                    };
+
+                    overwrite_file_with_content(&mut config_file, serialized_defaults)?;
+
+                    // saves creating another instance of DaemonOptions::default()
+                    return Ok(defaults);
+                }
+
+                Ok(DaemonOptions::default())
+            })()?;
+
+            configuration
+        };
+
+        println!("Loaded configuration: {:?}", config);
+
         Ok(
             Daemon {
                 brightness: file_utils.get_written_brightness()?,
                 mode: file_utils.get_written_mode()?,
                 displays: file_utils.get_written_displays()?,
+                config,
                 file_utils
             }
         )
