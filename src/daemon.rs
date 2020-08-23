@@ -157,6 +157,19 @@ impl FileUtils {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct DaemonOptions {
+    placeholder_option: u8
+}
+
+impl DaemonOptions {
+    fn default() -> DaemonOptions {
+        DaemonOptions {
+            placeholder_option: 10
+        }
+    }
+}
+
     brightness: u8,
     mode: bool,
     displays: Vec<String>,
