@@ -51,14 +51,14 @@ impl ProgramInput {
     }
 }
 
-struct FileUtils<'a> {
-    cache_directory: &'a std::path::Path,
+struct FileUtils {
+    project_directory: ProjectDirs,
     file_open_options: OpenOptions,
 }
 
-impl<'a> FileUtils<'a> {
+impl FileUtils {
     fn open_cache_file_with_options(&self, file_name: &str, open_options: &OpenOptions) -> Result<File> {
-        let filepath = self.cache_directory.join(file_name);
+        let filepath = self.project_directory.cache_dir().join(file_name);
         open_options.open(filepath)
     }
 
@@ -149,15 +149,14 @@ impl<'a> FileUtils<'a> {
     }
 }
 
-struct Daemon<'a> {
     brightness: u8,
     mode: bool,
     displays: Vec<String>,
-    file_utils: FileUtils<'a>
+    file_utils: FileUtils
 }
 
-impl<'a> Daemon<'a> {
-    fn new(project_directory: &'a ProjectDirs) -> Result<Daemon<'a>> {
+impl Daemon {
+    fn new(project_directory: ProjectDirs) -> Result<Daemon> {
         let file_open_options = {
             let mut file_open_options = OpenOptions::new();
             file_open_options.read(true);
@@ -167,7 +166,7 @@ impl<'a> Daemon<'a> {
         };
 
         let file_utils = FileUtils {
-            cache_directory: project_directory.cache_dir(),
+            project_directory,
             file_open_options
         };
 
@@ -182,7 +181,7 @@ impl<'a> Daemon<'a> {
     }
 
     fn run(&mut self) -> Result<()> {
-        let pid_file_path = self.file_utils.cache_directory.join("daemon.pid");
+        let pid_file_path = self.file_utils.project_directory.cache_dir().join("daemon.pid");
         let (stdout, stderr) = {
             let mut log_file_open_options = OpenOptions::new();
             log_file_open_options.create(true);
@@ -196,7 +195,7 @@ impl<'a> Daemon<'a> {
 
         let daemonize = Daemonize::new()
             .pid_file(pid_file_path)
-            .working_directory(&self.file_utils.cache_directory)
+            .working_directory(&self.file_utils.project_directory.cache_dir())
             .stdout(stdout)
             .stderr(stderr);
 
@@ -572,7 +571,7 @@ fn register_sigterm_handler() -> Result<()> {
 pub fn daemon() -> Result<()> {
     let project_directory = get_project_directory()?;
 
-    let mut daemon = Daemon::new(&project_directory)?;
+    let mut daemon = Daemon::new(project_directory)?;
     daemon.refresh_configuration()?;
 
     register_sigterm_handler()?;
