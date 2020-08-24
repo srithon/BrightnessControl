@@ -292,12 +292,12 @@ impl Daemon {
 
         for stream in listener.incoming() {
             match stream {
-                Ok(stream) => {
-                    let stream = BufReader::new(stream);
+                Ok(mut stream) => {
+                    let stream_reader = BufReader::new(&mut stream);
                     // Rust is amazing
                     // the compiler figured out the type of program_input based on the call to
                     // self.process_input 5 lines below
-                    let program_input = bincode_options.deserialize_from(stream);
+                    let program_input = bincode_options.deserialize_from(stream_reader);
                     match program_input {
                         Ok(program_input) => {
                             println!("Deserialized ProgramInput: {:?}", program_input);
@@ -307,6 +307,8 @@ impl Daemon {
                             eprintln!("Error deserializing: {}", err);
                         }
                     }
+
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
                 }
                 Err(_) => {
                     break;
