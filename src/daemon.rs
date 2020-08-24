@@ -301,7 +301,7 @@ impl Daemon {
                     match program_input {
                         Ok(program_input) => {
                             println!("Deserialized ProgramInput: {:?}", program_input);
-                            self.process_input(program_input)?;
+                            self.process_input(program_input, Some(&mut stream))?;
                         },
                         Err(err) => {
                             eprintln!("Error deserializing: {}", err);
@@ -335,10 +335,10 @@ impl Daemon {
             save_configuration: false
         };
 
-        self.process_input(blank_input)
+        self.process_input(blank_input, None)
     }
 
-    fn process_input(&mut self, program_input: ProgramInput) -> Result<()> {
+    fn process_input(&mut self, program_input: ProgramInput, socket: Option<&mut UnixStream>) -> Result<()> {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
         let brightness = program_input.brightness;
