@@ -201,8 +201,7 @@ impl Daemon {
 
                 // file exists
                 if file_existed {
-                    let buffered_reader = BufReader::new(&mut config_file);
-                    if let Ok(config) = toml::from_slice(buffered_reader.buffer()) {
+                    if let Ok(config) = get_configuration_from_file(&mut config_file) {
                         return Ok(config);
                     }
                 }
@@ -572,6 +571,11 @@ fn write_specified_displays_to_file(displays_file: &mut std::fs::File, connected
     displays_file.set_len(displays_file_length as u64)?;
 
     Ok(())
+}
+
+fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
+    let buffered_reader = BufReader::new(configuration_file);
+    toml::from_slice(buffered_reader.buffer())
 }
 
 fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
