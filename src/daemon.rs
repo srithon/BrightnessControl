@@ -37,15 +37,17 @@ pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
     configure_display: bool,
     toggle_nightlight: bool,
+    reload_configuration: bool,
     save_configuration: bool
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessChange>, configure_display: bool, toggle_nightlight: bool, save_configuration: bool) -> ProgramInput {
+    pub fn new(brightness: Option<BrightnessChange>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
         ProgramInput {
             brightness,
             configure_display,
             toggle_nightlight,
+            reload_configuration,
             save_configuration
         }
     }
@@ -328,6 +330,7 @@ impl Daemon {
             brightness: None,
             toggle_nightlight: false,
             configure_display: false,
+            reload_configuration: false,
             save_configuration: false
         };
 
@@ -340,6 +343,7 @@ impl Daemon {
         let brightness = program_input.brightness;
         let toggle_nightlight = program_input.toggle_nightlight;
         let configure_display = program_input.configure_display;
+        let reload_configuration = program_input.reload_configuration;
         let save_configuration = program_input.save_configuration;
 
         if toggle_nightlight {
@@ -590,6 +594,7 @@ fn register_sigterm_handler() -> Result<()> {
                             brightness: None,
                             toggle_nightlight: false,
                             configure_display: false,
+                            reload_configuration: false,
                             save_configuration: true
                         };
 
