@@ -17,6 +17,7 @@ fn get_cli_interface() -> Options {
         .optflag("b", "daemon", "Starts the BrightnessControl daemon")
         .optflag("c", "configure-display", "Uses the current display configuration for future calls to BrightnessControl")
         .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
+        .optflag("r", "reload-configuration", "Tells the daemon to re-read the configuration file and apply new changes")
         .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
         .optopt("i", "increment", "Increments the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
         .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE");

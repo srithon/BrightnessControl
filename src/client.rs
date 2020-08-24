@@ -76,6 +76,7 @@ pub fn handle_input(matches: Matches) -> Result<()> {
         brightness,
         matches.opt_present("configure-display"),
         matches.opt_present("toggle-nightlight"),
+        matches.opt_present("reload-configuration"),
         false
     );
 
