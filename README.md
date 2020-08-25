@@ -1,4 +1,5 @@
 # BrightnessControl
+[![Build Status](https://travis-ci.org/srithon/BrightnessControl.svg?branch=master)](https://travis-ci.org/srithon/BrightnessControl)
 
 ## Disclaimer: Linux + Xorg Only
 
