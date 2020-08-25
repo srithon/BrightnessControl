@@ -51,6 +51,16 @@ impl ProgramInput {
             save_configuration
         }
     }
+
+    pub fn returns_feedback(&self) -> bool {
+        // create a vector of all options that send back feedback to the client
+        let feedback_returning_options = vec![
+            self.reload_configuration
+        ];
+
+        // returns true if any of them are true
+        feedback_returning_options.iter().any(|&b| b)
+    }
 }
 
 struct FileUtils {
