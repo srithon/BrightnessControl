@@ -5,6 +5,10 @@ use std::io::{Error, ErrorKind, Write, Result};
 
 use std::os::unix::net::UnixStream;
 
+use std::io::{BufRead, BufReader};
+
+use std::time::Duration;
+
 use crate::daemon::*;
 
 fn check_brightness(matches: &Matches) -> Result<Option<BrightnessChange>> {
@@ -95,6 +99,17 @@ pub fn handle_input(matches: Matches) -> Result<()> {
     let binary_encoded_input = bincode_options.serialize(&program_input).unwrap();
 
     socket.write_all(&binary_encoded_input)?;
+
+    if program_input.returns_feedback() {
+        // TODO figure out if a read timeout is necessary
+        let buffered_reader = BufReader::with_capacity(512, &mut socket);
+        for line in buffered_reader.lines() {
+            match line {
+                Ok(line) => println!("{}", line),
+                Err(e) => eprintln!("Failed to read line: {}", e)
+            };
+        }
+    }
 
     socket.shutdown(std::net::Shutdown::Both)?;
 
