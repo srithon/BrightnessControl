@@ -177,13 +177,15 @@ impl FileUtils {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct DaemonOptions {
-    use_redshift: bool
+    use_redshift: bool,
+    auto_reconfigure: bool
 }
 
 impl DaemonOptions {
     fn default() -> DaemonOptions {
         DaemonOptions {
-            use_redshift: false
+            use_redshift: false,
+            auto_reconfigure: true
         }
     }
 }
@@ -395,7 +397,7 @@ impl Daemon {
 
                 let mut _call_handle = self.create_xrandr_command().spawn()?;
 
-                #[cfg(feature = "auto-reconfigure")]
+                if self.config.auto_reconfigure
                 {
                     let exit_status = _call_handle.wait()?;
 
@@ -649,7 +651,7 @@ fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Re
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift);
+    overwrite_values!(use_redshift, auto_reconfigure);
 
     return Ok(config);
 }
