@@ -8,7 +8,7 @@ This brightness is separate from the backlight.
 
 It also allows for an emulation of a blue light filter / night light, which can be toggled on/off. This emulation is part of `xrandr` itself.
 
-To use `redshift` instead of `xrandr` for the blue light filter, pass in the `redshift` feature during installation. Details on how to do this will be in the `Installation` section
+To use `redshift` instead of `xrandr` for the blue light filter, set `use_redshift` to `true` in the configuration file. More details on this will be in the `Configuration` section
 
 ***
 
@@ -34,39 +34,21 @@ Manually modifying these files while the daemon is running will have no effect.
 
 ***
 
-If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically reconfigure its list of displays **IF** the `auto-reconfigure` feature is enabled at compile-time.
+If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically reconfigure its list of displays **IF** `auto-reconfigure` is set to `true` in the configuration file.
 
-When this feature is not enabled, each individual client message takes less time to process because the daemon does not have to wait for each `xrandr` call to terminate before moving onto the next one
+When this is not enabled, each individual client message takes less time to process because the daemon does not have to wait for each `xrandr` call to terminate before moving onto the next one
 
 The `xrandr` call will only fail if a display is *disconnected*, so even with `auto-reconfigure` enabled, the daemon will not automatically reconfigure when a new monitor is connected.
 
 For users that often disconnect and reconnect monitors, the [srandrd](https://github.com/jceb/srandrd) tool can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
 
-This is a good alternative to the `auto-reconfigure` feature, which also has the advantage of working when a new monitor is connected
-
-Instructions on how to enable/disable this feature are in the Installation section
+This is a good alternative to `auto-reconfigure`, which also has the advantage of working when a new monitor is connected
 
 ## Installation
 *From the project root*
 
-The list of features that are enabled by default are under the `[features]` section in `Cargo.toml`
-Currently, there are no features enabled by default; this is denoted by the following line
-`default = []`
-
-**WITH DEFAULT FEATURES**
 ```
 cargo install --path . --root ~/.local/
-```
-
-**WITH OPTIONAL FEATURES**
-
-During installation, pass in a space-separated list of the features that you want after `--features`
-
-The list of available features can be found in the `[features]` section in `Cargo.toml`
-
-The resulting command is below; anything in square brackets is optional
-```
-cargo install --features "[auto-reconfigure] [redshift]" --path . --root ~/.local/
 ```
 
 ***
