@@ -1,7 +1,8 @@
 # BrightnessControl
-[![Build Status](https://travis-ci.org/srithon/BrightnessControl.svg?branch=master)](https://travis-ci.org/srithon/BrightnessControl)
 
 ## Disclaimer: Linux + Xorg Only
+
+[![Build Status](https://travis-ci.org/srithon/BrightnessControl.svg?branch=master)](https://travis-ci.org/srithon/BrightnessControl)
 
 `BrightnessControl` is a wrapper around `xrandr` that allows for easy adjustments of brightness.
 
