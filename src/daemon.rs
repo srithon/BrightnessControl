@@ -1,5 +1,6 @@
 use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
+use toml::Value;
 use directories::ProjectDirs;
 
 use serde::{Serialize, Deserialize};
@@ -631,7 +632,26 @@ fn write_specified_displays_to_file(displays_file: &mut std::fs::File, connected
 
 fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
     let buffered_reader = BufReader::new(configuration_file);
-    toml::from_slice(buffered_reader.buffer())
+    let parsed_toml: toml::Value = toml::from_slice(buffered_reader.buffer())?;
+
+    let mut config = DaemonOptions::default();
+
+    macro_rules! overwrite_values {
+        ( $( $x:ident ),* ) => {
+            {
+                $(
+                    if let Some(option) = parsed_toml.get(stringify!($x)) {
+                        config.$x = option.clone().try_into()?;
+                    }
+                )*
+            }
+        };
+    }
+
+    // TODO figure out how to use derive macro for this
+    overwrite_values!(placeholder_option);
+
+    return Ok(config);
 }
 
 fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
