@@ -409,6 +409,45 @@ impl Daemon {
             self.reconfigure_displays()?;
         }
 
+        if reload_configuration {
+            if let Ok( (mut configuration_file, _) ) = self.file_utils.open_configuration_file() {
+                let config_result = get_configuration_from_file(&mut configuration_file);
+
+                // dont want to print success to stderr when there is no socket
+                // since 'socket' is being moved into the closure below, the logic cannot check 'socket.is_some()'.
+                // this boolean is needed to allow the logging to be skipped
+                let socket_available = socket.is_some();
+
+                let write_message = move |message: String| {
+                    if let Some(socket) = socket {
+                        if let Err(e) = socket.write_all(message.as_bytes()) {
+                            eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                        }
+                    }
+                    else {
+                        eprintln!("{}", message);
+                    }
+                };
+
+                match config_result {
+                    Ok(config) => {
+                        self.config = config;
+
+                        // only log success if there is a socket
+                        if socket_available {
+                            write_message("Successfully reloaded configuration!".to_string());
+                        }
+                    }
+                    Err(error) => {
+                        write_message(format!("Failed to parse configuration file: {}", error));
+                    }
+                }
+            }
+            else {
+                eprintln!("Failed to open configuration file for reloading!");
+            }
+        }
+
         if save_configuration {
             self.save_configuration()?;
         }
