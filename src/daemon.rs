@@ -177,13 +177,13 @@ impl FileUtils {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct DaemonOptions {
-    placeholder_option: u8
+    use_redshift: bool
 }
 
 impl DaemonOptions {
     fn default() -> DaemonOptions {
         DaemonOptions {
-            placeholder_option: 10
+            use_redshift: false
         }
     }
 }
@@ -649,7 +649,7 @@ fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Re
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(placeholder_option);
+    overwrite_values!(use_redshift);
 
     return Ok(config);
 }
