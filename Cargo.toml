@@ -19,9 +19,6 @@ toml = "0.5.6"
 # reconfigures display if xrandr call fails
 auto-reconfigure = []
 
-# use redshift for blue light filter
-redshift = []
-
 ##########################
 # this is not a feature
 default = []

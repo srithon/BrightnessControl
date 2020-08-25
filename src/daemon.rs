@@ -366,7 +366,7 @@ impl Daemon {
         if toggle_nightlight {
             self.mode = !self.mode;
 
-            #[cfg(feature = "redshift")]
+            if self.config.use_redshift
             {
                 if self.mode {
                     // turn on redshift
@@ -492,7 +492,7 @@ impl Daemon {
         xrandr_call.arg("--brightness")
             .arg(brightness_string);
 
-        #[cfg(not(feature = "redshift"))]
+        if !self.config.use_redshift
         {
             if self.mode {
                 xrandr_call.arg("--gamma")
