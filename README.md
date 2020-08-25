@@ -132,6 +132,19 @@ $ brightness_control --daemon
 $ brightness_control --help
 ```
 
+*To Reload the Daemon Configuration*
+```
+$ brightness_control --reload-configuration
+```
+
+## Configuration
+`BrightnessControl`'s reads its runtime configuration from `~/.config/brightnesscontrol/config.toml`
+If the file does not exist when the daemon is started, it automatically creates the file and writes the default configuration.
+
+After that, you can reload the configuration without restarting the daemon by running `brightness_control --reload-configuration` as shown above.
+
+If the file cannot be parsed, the client will print out the error.
+
 ## Keybinding
 All of these commands can be bound to keybindings for ease-of-use.
 
