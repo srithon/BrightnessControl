@@ -61,8 +61,13 @@ struct FileUtils {
 impl FileUtils {
     // returns the file and whether or not it existed prior to opening it
     fn open_configuration_file(&self) -> Result<(File, bool)> {
-        let filepath = self.project_directory.config_dir().join("config.toml");
-        std::fs::create_dir(self.project_directory.config_dir())?;
+        let config_dir = self.project_directory.config_dir();
+        let filepath = config_dir.join("config.toml");
+
+        if !config_dir.exists() {
+            std::fs::create_dir(self.project_directory.config_dir())?;
+        }
+
         let file_exists = std::fs::metadata(&filepath).is_ok();
         Ok( (self.file_open_options.open(filepath)?, file_exists) )
     }
