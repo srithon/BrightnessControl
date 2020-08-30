@@ -10,6 +10,7 @@ jobs:
   fast_finish: true
 script:
   - cargo build --verbose
+before_deploy:
   - cargo build --release
 deploy:
   provider: releases
