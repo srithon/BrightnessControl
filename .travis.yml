@@ -1,20 +1,20 @@
 language: rust
 cache: cargo
 rust:
-  - stable
-  - beta
-  - nightly
+- stable
+- beta
+- nightly
 jobs:
   allow_failures:
-    - rust: nightly
+  - rust: nightly
   fast_finish: true
 script:
-  - cargo build --verbose
+- cargo build --verbose
 before_deploy:
-  - cargo build --release
+- cargo build --release
 deploy:
   provider: releases
-  file: "target/release/brightness_control"
+  file: target/release/brightness_control
   skip_cleanup: true
   draft: true
   on:
