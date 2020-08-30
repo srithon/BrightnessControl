@@ -8,3 +8,12 @@ jobs:
   allow_failures:
     - rust: nightly
   fast_finish: true
+script:
+  - cargo build --verbose
+  - cargo build --release
+deploy:
+  provider: releases
+  file: "target/release/brightness_control"
+  skip_cleanup: true
+  on:
+    tags: true
