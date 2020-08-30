@@ -16,6 +16,7 @@ deploy:
   provider: releases
   file: "target/release/brightness_control"
   skip_cleanup: true
+  draft: true
   on:
     tags: true
 env:
