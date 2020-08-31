@@ -21,11 +21,6 @@ pub fn get_bincode_options() -> DefaultOptions {
     options
 }
 
-enum DataValidatorResult<T> {
-    Valid(T),
-    Changed(T),
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub enum BrightnessChange {
     Adjustment(i8),
@@ -114,7 +109,7 @@ impl FileUtils {
             if let Ok(num) = data_in_file.parse::<u8>() {
                 if num == 0 || num == 1 {
                     // cannot cast "num as bool" normally
-                    return Ok(Valid(num != 0));
+                    return Ok(num != 0);
                 }
             }
 
@@ -147,7 +142,7 @@ impl FileUtils {
             if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
                 // check bounds
                 if num <= 100 {
-                    return Ok(Valid(num));
+                    return Ok(num);
                 }
             }
 
@@ -551,8 +546,6 @@ impl Daemon {
     }
 }
 
-use DataValidatorResult::*;
-
 fn overwrite_file_with_content<T>(file: &mut File, new_content: T) -> Result<()>
 where T: Display {
     file.seek(std::io::SeekFrom::Start(0))?;
@@ -568,14 +561,14 @@ where T: Display {
 }
 
 // where ....
-fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<DataValidatorResult<T>>, default_value: T) -> Result<T>
+fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
 where T: Display {
     let file_contents = {
         // wrapping in a closure allows the inner else and the
         // outer else clauses to share the same code
         // here, we want to return None if the file does not exist
         // or if the file's contents are not readable as a number
-        (|| -> std::io::Result<DataValidatorResult<T>> {
+        (|| -> std::io::Result<T> {
             let mut buffer: Vec<u8> = Vec::new();
             file.read_to_end(&mut buffer)?;
 
@@ -587,22 +580,12 @@ where T: Display {
         })()
     };
 
-    if let Ok(Valid(contents)) = file_contents {
+    if let Ok(contents) = file_contents {
         Ok(contents)
     }
     else {
-        let new_value = {
-            if let Ok(Changed(new_value)) = file_contents {
-                new_value
-            }
-            else {
-                default_value
-            }
-        };
-
-        overwrite_file_with_content(file, &new_value)?;
-
-        Ok(new_value)
+        overwrite_file_with_content(file, &default_value)?;
+        Ok(default_value)
     }
 }
 
