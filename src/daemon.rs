@@ -383,10 +383,10 @@ impl Daemon {
 
     fn refresh_redshift(&mut self) -> Result<()> {
         if self.mode {
-            self.enable_redshift();
+            self.enable_redshift()?;
         }
         else {
-            self.clear_redshift();
+            self.clear_redshift()?;
         }
 
         Ok(())
