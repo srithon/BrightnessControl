@@ -411,9 +411,28 @@ impl Daemon {
         let reload_configuration = program_input.reload_configuration;
         let save_configuration = program_input.save_configuration;
 
+        let write_message = move |message: &str| {
+            if let Err(e) = socket.write_all(message.as_bytes()) {
+                eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+            }
+        };
+
         if toggle_nightlight {
             self.mode = !self.mode;
-            self.refresh_if_redshift()?;
+
+            if let Err(e) = self.refresh_if_redshift() {
+                write_message(format!("Failed to refresh redshift: {}", e));
+            }
+            else {
+                // could have used format! to make this a one-liner, but this allows the strings to be
+                // stored in static memory instead of having to be generated at runtime
+                if self.mode {
+                    write_message("Enabled nightlight");
+                }
+                else {
+                    write_message("Disabled nightlight");
+                }
+            }
         }
 
         match brightness {
@@ -427,59 +446,59 @@ impl Daemon {
 
                 // this returns true if refresh_brightness reconfigured the display automatically
                 // dont want to reconfigure AGAIN
-                let skip_configure_display = self.refresh_brightness()?;
-                if skip_configure_display {
-                    configure_display = false;
-                }
+                match self.refresh_brightness() {
+                    Ok(skip_configure_display) => {
+                        if skip_configure_display {
+                            configure_display = false;
+                            write_message("Automatically reconfigured displays!");
+                        }
+                    },
+                    Err(e) => {
+                        write_message(format!("Failed to refresh brightness: {}", e));
+                    }
+                };
             },
             None => ()
         };
 
         if configure_display {
-            self.reconfigure_displays()?;
+            if let Err(e) = self.reconfigure_displays() {
+                write_message(format!("Failed to reconfigure displays: {}", e));
+            }
+            else {
+                write_message("Successfully reconfigured displays!");
+            }
         }
 
         if reload_configuration {
-            if let Ok( (mut configuration_file, _) ) = self.file_utils.open_configuration_file() {
-                let config_result = get_configuration_from_file(&mut configuration_file);
+            match self.file_utils.open_configuration_file() {
+                Ok( (mut configuration_file, _) ) => {
+                    let config_result = get_configuration_from_file(&mut configuration_file);
 
-                // dont want to print success to stderr when there is no socket
-                // since 'socket' is being moved into the closure below, the logic cannot check 'socket.is_some()'.
-                // this boolean is needed to allow the logging to be skipped
-                let socket_available = socket.is_some();
+                    match config_result {
+                        Ok(config) => {
+                            self.config = config;
 
-                let write_message = move |message: String| {
-                    if let Some(socket) = socket {
-                        if let Err(e) = socket.write_all(message.as_bytes()) {
-                            eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                            write_message("Successfully reloaded configuration!");
+                        }
+                        Err(error) => {
+                            write_message(format!("Failed to parse configuration file: {}", error));
                         }
                     }
-                    else {
-                        eprintln!("{}", message);
-                    }
-                };
-
-                match config_result {
-                    Ok(config) => {
-                        self.config = config;
-
-                        // only log success if there is a socket
-                        if socket_available {
-                            write_message("Successfully reloaded configuration!".to_string());
-                        }
-                    }
-                    Err(error) => {
-                        write_message(format!("Failed to parse configuration file: {}", error));
-                    }
+                },
+                Err(e) => {
+                    write_message("Failed to open configuration file for reloading!");
                 }
-            }
-            else {
-                eprintln!("Failed to open configuration file for reloading!");
             }
         }
 
         if save_configuration {
-            self.save_configuration()?;
+            if let Err(e) = self.save_configuration() {
+                write_message(format!("Failed to save configuration: {}", e));
+            }
+            else {
+                write_message("Successfully saved configuration!");
+            }
         }
 
         Ok(())
