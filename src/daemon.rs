@@ -661,7 +661,13 @@ fn write_specified_displays_to_file(displays_file: &mut std::fs::File, connected
 }
 
 fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
-    let buffered_reader = BufReader::new(configuration_file);
+    let mut buffered_reader = BufReader::new(configuration_file);
+
+    // fill buffer
+    if let Err(e) = buffered_reader.fill_buf() {
+        eprintln!("Failed to read from configuration file! {}", e);
+    }
+
     let parsed_toml: toml::Value = toml::from_slice(buffered_reader.buffer())?;
 
     let mut config = DaemonOptions::default();
