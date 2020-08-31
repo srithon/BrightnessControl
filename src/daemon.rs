@@ -411,7 +411,7 @@ impl Daemon {
         let reload_configuration = program_input.reload_configuration;
         let save_configuration = program_input.save_configuration;
 
-        let write_message = move |message: &str| {
+        let mut write_message = move |message: &str| {
             if let Err(e) = socket.write_all(message.as_bytes()) {
                 eprintln!("Failed to write \"{}\" to socket: {}", message, e);
             }
