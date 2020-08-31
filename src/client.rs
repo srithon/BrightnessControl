@@ -100,7 +100,7 @@ pub fn handle_input(matches: Matches) -> Result<()> {
 
     socket.write_all(&binary_encoded_input)?;
 
-    if program_input.returns_feedback() {
+    if !matches.opt_present("quiet") {
         // TODO figure out if a read timeout is necessary
         let buffered_reader = BufReader::with_capacity(512, &mut socket);
         for line in buffered_reader.lines() {
