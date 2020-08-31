@@ -430,6 +430,7 @@ impl Daemon {
                 else {
                     if let Err(e) = self.refresh_brightness() {
                         write_message(&format!("Failed to refresh xrandr: {}", e));
+                        return;
                     }
                 }
 
