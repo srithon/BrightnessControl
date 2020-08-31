@@ -408,7 +408,7 @@ impl Daemon {
         // struct elements
         let brightness = program_input.brightness;
         let toggle_nightlight = program_input.toggle_nightlight;
-        let configure_display = program_input.configure_display;
+        let mut configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
         let save_configuration = program_input.save_configuration;
 
@@ -426,7 +426,12 @@ impl Daemon {
                     }
                 };
 
-                self.refresh_brightness()?;
+                // this returns true if refresh_brightness reconfigured the display automatically
+                // dont want to reconfigure AGAIN
+                let skip_configure_display = self.refresh_brightness()?;
+                if skip_configure_display {
+                    configure_display = false;
+                }
             },
             None => ()
         };
