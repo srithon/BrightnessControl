@@ -381,15 +381,12 @@ impl Daemon {
         Ok(())
     }
 
-    fn refresh_if_redshift(&mut self) -> Result<()> {
-        if self.config.use_redshift
-        {
-            if self.mode {
-                self.enable_redshift();
-            }
-            else {
-                self.clear_redshift();
-            }
+    fn refresh_redshift(&mut self) -> Result<()> {
+        if self.mode {
+            self.enable_redshift();
+        }
+        else {
+            self.clear_redshift();
         }
 
         Ok(())
@@ -398,7 +395,10 @@ impl Daemon {
     fn refresh_configuration(&mut self) -> Result<()> {
         // don't need the early return flag here
         let _ = self.refresh_brightness()?;
-        self.refresh_if_redshift()?;
+        if self.config.use_redshift {
+            self.refresh_redshift()?;
+        }
+
         Ok(())
     }
 
@@ -420,10 +420,19 @@ impl Daemon {
         if toggle_nightlight {
             self.mode = !self.mode;
 
-            if let Err(e) = self.refresh_if_redshift() {
-                write_message(&format!("Failed to refresh redshift: {}", e));
-            }
-            else {
+            (|| {
+                if self.config.use_redshift {
+                    if let Err(e) = self.refresh_redshift() {
+                        write_message(&format!("Failed to refresh redshift: {}", e));
+                        return;
+                    }
+                }
+                else {
+                    if let Err(e) = self.refresh_brightness() {
+                        write_message(&format!("Failed to refresh xrandr: {}", e));
+                    }
+                }
+
                 // could have used format! to make this a one-liner, but this allows the strings to be
                 // stored in static memory instead of having to be generated at runtime
                 if self.mode {
@@ -432,7 +441,7 @@ impl Daemon {
                 else {
                     write_message("Disabled nightlight");
                 }
-            }
+            })()
         }
 
         match brightness {
