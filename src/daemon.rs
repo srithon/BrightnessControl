@@ -421,7 +421,7 @@ impl Daemon {
             self.mode = !self.mode;
 
             if let Err(e) = self.refresh_if_redshift() {
-                write_message(format!("Failed to refresh redshift: {}", e));
+                write_message(&format!("Failed to refresh redshift: {}", e));
             }
             else {
                 // could have used format! to make this a one-liner, but this allows the strings to be
@@ -454,7 +454,7 @@ impl Daemon {
                         }
                     },
                     Err(e) => {
-                        write_message(format!("Failed to refresh brightness: {}", e));
+                        write_message(&format!("Failed to refresh brightness: {}", e));
                     }
                 };
             },
@@ -463,7 +463,7 @@ impl Daemon {
 
         if configure_display {
             if let Err(e) = self.reconfigure_displays() {
-                write_message(format!("Failed to reconfigure displays: {}", e));
+                write_message(&format!("Failed to reconfigure displays: {}", e));
             }
             else {
                 write_message("Successfully reconfigured displays!");
@@ -482,7 +482,7 @@ impl Daemon {
                             write_message("Successfully reloaded configuration!");
                         }
                         Err(error) => {
-                            write_message(format!("Failed to parse configuration file: {}", error));
+                            write_message(&format!("Failed to parse configuration file: {}", error));
                         }
                     }
                 },
@@ -494,7 +494,7 @@ impl Daemon {
 
         if save_configuration {
             if let Err(e) = self.save_configuration() {
-                write_message(format!("Failed to save configuration: {}", e));
+                write_message(&format!("Failed to save configuration: {}", e));
             }
             else {
                 write_message("Successfully saved configuration!");
