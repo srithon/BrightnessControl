@@ -356,6 +356,59 @@ impl Daemon {
         self.process_input(blank_input, None)
     }
 
+    // boolean signals whether to early return or not in process_input
+    fn refresh_brightness(&mut self) -> Result<bool> {
+        let mut _call_handle = self.create_xrandr_command().spawn()?;
+
+        if self.config.auto_reconfigure
+        {
+            let exit_status = _call_handle.wait()?;
+
+            // if the call fails, then the configuration is no longer valid
+            // reconfigures the display and then tries again
+            if !exit_status.success() {
+                println!("Reconfiguring!");
+                // force reconfigure
+                self.reconfigure_displays()?;
+                self.create_xrandr_command().spawn()?;
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn clear_redshift(&mut self) -> Result<()> {
+        // turn off redshift
+        let mut redshift_disable = Command::new("redshift");
+        redshift_disable.arg("-x");
+        redshift_disable.spawn()?;
+        Ok(())
+    }
+
+    fn enable_redshift(&mut self) -> Result<()> {
+        // turn on redshift
+        let mut redshift_enable = Command::new("redshift");
+        redshift_enable.arg("-O");
+        redshift_enable.arg("1400");
+        redshift_enable.spawn()?;
+        Ok(())
+    }
+
+    fn refresh_if_redshift(&mut self) -> Result<()> {
+        if self.config.use_redshift
+        {
+            if self.mode {
+                self.enable_redshift();
+            }
+            else {
+                self.clear_redshift();
+            }
+        }
+
+        Ok(())
+    }
+
     fn process_input(&mut self, program_input: ProgramInput, socket: Option<&mut UnixStream>) -> Result<()> {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
@@ -367,23 +420,7 @@ impl Daemon {
 
         if toggle_nightlight {
             self.mode = !self.mode;
-
-            if self.config.use_redshift
-            {
-                if self.mode {
-                    // turn on redshift
-                    let mut redshift_enable = Command::new("redshift");
-                    redshift_enable.arg("-O");
-                    redshift_enable.arg("1400");
-                    redshift_enable.spawn()?;
-                }
-                else {
-                    // turn off redshift
-                    let mut redshift_disable = Command::new("redshift");
-                    redshift_disable.arg("-x");
-                    redshift_disable.spawn()?;
-                }
-            }
+            self.refresh_if_redshift()?;
         }
 
         match brightness {
@@ -395,25 +432,7 @@ impl Daemon {
                     }
                 };
 
-                let mut _call_handle = self.create_xrandr_command().spawn()?;
-
-                if self.config.auto_reconfigure
-                {
-                    let exit_status = _call_handle.wait()?;
-
-                    // if the call fails, then the configuration is no longer valid
-                    // reconfigures the display and then tries again
-                    if !exit_status.success() {
-                        println!("Reconfiguring!");
-                        // force reconfigure
-                        self.reconfigure_displays()?;
-                        self.create_xrandr_command().spawn()?;
-
-                        // if configure_display is true, dont want to reconfigure again
-                        // instead of branching, just return early regardless
-                        return Ok(());
-                    }
-                }
+                self.refresh_brightness()?;
             },
             None => ()
         };
