@@ -354,7 +354,6 @@ impl Daemon {
             // if the call fails, then the configuration is no longer valid
             // reconfigures the display and then tries again
             if !exit_status.success() {
-                println!("Reconfiguring!");
                 // force reconfigure
                 self.reconfigure_displays()?;
                 self.create_xrandr_command().spawn()?;
