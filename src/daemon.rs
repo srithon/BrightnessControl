@@ -448,6 +448,8 @@ impl Daemon {
                 // dont want to reconfigure AGAIN
                 match self.refresh_brightness() {
                     Ok(skip_configure_display) => {
+                        write_message(&format!("Set brightness to {}%", self.brightness));
+
                         if skip_configure_display {
                             configure_display = false;
                             write_message("Automatically reconfigured displays!");
