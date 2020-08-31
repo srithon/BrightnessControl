@@ -499,7 +499,7 @@ impl Daemon {
                     }
                 },
                 Err(e) => {
-                    write_message("Failed to open configuration file for reloading!");
+                    write_message(&format!("Failed to open configuration file for reloading: {}", e));
                 }
             }
         }
