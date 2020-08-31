@@ -343,19 +343,6 @@ impl Daemon {
         Ok(())
     }
 
-    // pass in blank input to process_input to refresh
-    fn refresh_configuration(&mut self) -> Result<()> {
-        let blank_input = ProgramInput {
-            brightness: None,
-            toggle_nightlight: false,
-            configure_display: false,
-            reload_configuration: false,
-            save_configuration: false
-        };
-
-        self.process_input(blank_input, None)
-    }
-
     // boolean signals whether to early return or not in process_input
     fn refresh_brightness(&mut self) -> Result<bool> {
         let mut _call_handle = self.create_xrandr_command().spawn()?;
@@ -406,6 +393,13 @@ impl Daemon {
             }
         }
 
+        Ok(())
+    }
+
+    fn refresh_configuration(&mut self) -> Result<()> {
+        // don't need the early return flag here
+        let _ = self.refresh_brightness()?;
+        self.refresh_if_redshift()?;
         Ok(())
     }
 
