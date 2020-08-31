@@ -1,6 +1,5 @@
 use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
-use toml::Value;
 use directories::ProjectDirs;
 
 use serde::{Serialize, Deserialize};
@@ -20,11 +19,6 @@ pub fn get_bincode_options() -> DefaultOptions {
     let options = bincode::DefaultOptions::default();
     options.with_fixint_encoding();
     options
-}
-
-enum DataValidatorResult<T> {
-    Valid(T),
-    Changed(T),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -115,7 +109,7 @@ impl FileUtils {
             if let Ok(num) = data_in_file.parse::<u8>() {
                 if num == 0 || num == 1 {
                     // cannot cast "num as bool" normally
-                    return Ok(Valid(num != 0));
+                    return Ok(num != 0);
                 }
             }
 
@@ -148,7 +142,7 @@ impl FileUtils {
             if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
                 // check bounds
                 if num <= 100 {
-                    return Ok(Valid(num));
+                    return Ok(num);
                 }
             }
 
@@ -319,7 +313,7 @@ impl Daemon {
                     match program_input {
                         Ok(program_input) => {
                             println!("Deserialized ProgramInput: {:?}", program_input);
-                            self.process_input(program_input, Some(&mut stream))?;
+                            self.process_input(program_input, &mut stream);
                         },
                         Err(err) => {
                             eprintln!("Error deserializing: {}", err);
@@ -343,47 +337,106 @@ impl Daemon {
         Ok(())
     }
 
-    // pass in blank input to process_input to refresh
-    fn refresh_configuration(&mut self) -> Result<()> {
-        let blank_input = ProgramInput {
-            brightness: None,
-            toggle_nightlight: false,
-            configure_display: false,
-            reload_configuration: false,
-            save_configuration: false
-        };
+    // boolean signals whether to skip display reconfiguration in process_input
+    fn refresh_brightness(&mut self) -> Result<bool> {
+        let mut _call_handle = self.create_xrandr_command().spawn()?;
 
-        self.process_input(blank_input, None)
+        if self.config.auto_reconfigure
+        {
+            let exit_status = _call_handle.wait()?;
+
+            // if the call fails, then the configuration is no longer valid
+            // reconfigures the display and then tries again
+            if !exit_status.success() {
+                // force reconfigure
+                self.reconfigure_displays()?;
+                self.create_xrandr_command().spawn()?;
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 
-    fn process_input(&mut self, program_input: ProgramInput, socket: Option<&mut UnixStream>) -> Result<()> {
+    fn clear_redshift(&mut self) -> Result<()> {
+        // turn off redshift
+        let mut redshift_disable = Command::new("redshift");
+        redshift_disable.arg("-x");
+        redshift_disable.spawn()?;
+        Ok(())
+    }
+
+    fn enable_redshift(&mut self) -> Result<()> {
+        // turn on redshift
+        let mut redshift_enable = Command::new("redshift");
+        redshift_enable.arg("-O");
+        redshift_enable.arg("1400");
+        redshift_enable.spawn()?;
+        Ok(())
+    }
+
+    fn refresh_redshift(&mut self) -> Result<()> {
+        if self.mode {
+            self.enable_redshift()?;
+        }
+        else {
+            self.clear_redshift()?;
+        }
+
+        Ok(())
+    }
+
+    fn refresh_configuration(&mut self) -> Result<()> {
+        // don't need the early return flag here
+        let _ = self.refresh_brightness()?;
+        if self.config.use_redshift {
+            self.refresh_redshift()?;
+        }
+
+        Ok(())
+    }
+
+    fn process_input(&mut self, program_input: ProgramInput, socket: &mut UnixStream) {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
         let brightness = program_input.brightness;
         let toggle_nightlight = program_input.toggle_nightlight;
-        let configure_display = program_input.configure_display;
+        let mut configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
         let save_configuration = program_input.save_configuration;
+
+        let mut write_message = move |message: &str| {
+            if let Err(e) = socket.write_all(message.as_bytes()) {
+                eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+            }
+        };
 
         if toggle_nightlight {
             self.mode = !self.mode;
 
-            if self.config.use_redshift
-            {
-                if self.mode {
-                    // turn on redshift
-                    let mut redshift_enable = Command::new("redshift");
-                    redshift_enable.arg("-O");
-                    redshift_enable.arg("1400");
-                    redshift_enable.spawn()?;
+            (|| {
+                if self.config.use_redshift {
+                    if let Err(e) = self.refresh_redshift() {
+                        write_message(&format!("Failed to refresh redshift: {}", e));
+                        return;
+                    }
                 }
                 else {
-                    // turn off redshift
-                    let mut redshift_disable = Command::new("redshift");
-                    redshift_disable.arg("-x");
-                    redshift_disable.spawn()?;
+                    if let Err(e) = self.refresh_brightness() {
+                        write_message(&format!("Failed to refresh xrandr: {}", e));
+                        return;
+                    }
                 }
-            }
+
+                // could have used format! to make this a one-liner, but this allows the strings to be
+                // stored in static memory instead of having to be generated at runtime
+                if self.mode {
+                    write_message("Enabled nightlight");
+                }
+                else {
+                    write_message("Disabled nightlight");
+                }
+            })()
         }
 
         match brightness {
@@ -395,77 +448,64 @@ impl Daemon {
                     }
                 };
 
-                let mut _call_handle = self.create_xrandr_command().spawn()?;
+                // this returns true if refresh_brightness reconfigured the display automatically
+                // dont want to reconfigure AGAIN
+                match self.refresh_brightness() {
+                    Ok(skip_configure_display) => {
+                        write_message(&format!("Set brightness to {}%", self.brightness));
 
-                if self.config.auto_reconfigure
-                {
-                    let exit_status = _call_handle.wait()?;
-
-                    // if the call fails, then the configuration is no longer valid
-                    // reconfigures the display and then tries again
-                    if !exit_status.success() {
-                        println!("Reconfiguring!");
-                        // force reconfigure
-                        self.reconfigure_displays()?;
-                        self.create_xrandr_command().spawn()?;
-
-                        // if configure_display is true, dont want to reconfigure again
-                        // instead of branching, just return early regardless
-                        return Ok(());
+                        if skip_configure_display {
+                            configure_display = false;
+                            write_message("Automatically reconfigured displays!");
+                        }
+                    },
+                    Err(e) => {
+                        write_message(&format!("Failed to refresh brightness: {}", e));
                     }
-                }
+                };
             },
             None => ()
         };
 
         if configure_display {
-            self.reconfigure_displays()?;
+            if let Err(e) = self.reconfigure_displays() {
+                write_message(&format!("Failed to reconfigure displays: {}", e));
+            }
+            else {
+                write_message("Successfully reconfigured displays!");
+            }
         }
 
         if reload_configuration {
-            if let Ok( (mut configuration_file, _) ) = self.file_utils.open_configuration_file() {
-                let config_result = get_configuration_from_file(&mut configuration_file);
+            match self.file_utils.open_configuration_file() {
+                Ok( (mut configuration_file, _) ) => {
+                    let config_result = get_configuration_from_file(&mut configuration_file);
 
-                // dont want to print success to stderr when there is no socket
-                // since 'socket' is being moved into the closure below, the logic cannot check 'socket.is_some()'.
-                // this boolean is needed to allow the logging to be skipped
-                let socket_available = socket.is_some();
+                    match config_result {
+                        Ok(config) => {
+                            self.config = config;
 
-                let write_message = move |message: String| {
-                    if let Some(socket) = socket {
-                        if let Err(e) = socket.write_all(message.as_bytes()) {
-                            eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                            write_message("Successfully reloaded configuration!");
+                        }
+                        Err(error) => {
+                            write_message(&format!("Failed to parse configuration file: {}", error));
                         }
                     }
-                    else {
-                        eprintln!("{}", message);
-                    }
-                };
-
-                match config_result {
-                    Ok(config) => {
-                        self.config = config;
-
-                        // only log success if there is a socket
-                        if socket_available {
-                            write_message("Successfully reloaded configuration!".to_string());
-                        }
-                    }
-                    Err(error) => {
-                        write_message(format!("Failed to parse configuration file: {}", error));
-                    }
+                },
+                Err(e) => {
+                    write_message(&format!("Failed to open configuration file for reloading: {}", e));
                 }
-            }
-            else {
-                eprintln!("Failed to open configuration file for reloading!");
             }
         }
 
         if save_configuration {
-            self.save_configuration()?;
+            if let Err(e) = self.save_configuration() {
+                write_message(&format!("Failed to save configuration: {}", e));
+            }
+            else {
+                write_message("Successfully saved configuration!");
+            }
         }
-
-        Ok(())
     }
 
     fn reconfigure_displays(&mut self) -> Result<()> {
@@ -506,8 +546,6 @@ impl Daemon {
     }
 }
 
-use DataValidatorResult::*;
-
 fn overwrite_file_with_content<T>(file: &mut File, new_content: T) -> Result<()>
 where T: Display {
     file.seek(std::io::SeekFrom::Start(0))?;
@@ -523,14 +561,14 @@ where T: Display {
 }
 
 // where ....
-fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<DataValidatorResult<T>>, default_value: T) -> Result<T>
+fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
 where T: Display {
     let file_contents = {
         // wrapping in a closure allows the inner else and the
         // outer else clauses to share the same code
         // here, we want to return None if the file does not exist
         // or if the file's contents are not readable as a number
-        (|| -> std::io::Result<DataValidatorResult<T>> {
+        (|| -> std::io::Result<T> {
             let mut buffer: Vec<u8> = Vec::new();
             file.read_to_end(&mut buffer)?;
 
@@ -542,22 +580,12 @@ where T: Display {
         })()
     };
 
-    if let Ok(Valid(contents)) = file_contents {
+    if let Ok(contents) = file_contents {
         Ok(contents)
     }
     else {
-        let new_value = {
-            if let Ok(Changed(new_value)) = file_contents {
-                new_value
-            }
-            else {
-                default_value
-            }
-        };
-
-        overwrite_file_with_content(file, &new_value)?;
-
-        Ok(new_value)
+        overwrite_file_with_content(file, &default_value)?;
+        Ok(default_value)
     }
 }
 

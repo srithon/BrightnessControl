@@ -70,6 +70,8 @@ All brightness_control options have shorthands. For most of them, the first lett
 
 When using shorthands, the separating space between an option and its value may be omitted. This is shown in the first example, and can be applied to any option that takes a value
 
+Since version `1.4.1`, client commands that interact with the daemon will return feedback. To suppress this output (when using keybindings, for example), pass the `--quiet` or `-q` flag with the command. This flag allows the client to terminate and shutdown the socket without having to wait for the daemon to respond.
+
 *To Reduce the Brightness by 10%*
 ```
 $ brightness_control --decrement 10
