@@ -343,7 +343,7 @@ impl Daemon {
         Ok(())
     }
 
-    // boolean signals whether to early return or not in process_input
+    // boolean signals whether to skip display reconfiguration in process_input
     fn refresh_brightness(&mut self) -> Result<bool> {
         let mut _call_handle = self.create_xrandr_command().spawn()?;
 
