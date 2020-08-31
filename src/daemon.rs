@@ -1,6 +1,5 @@
 use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
-use toml::Value;
 use directories::ProjectDirs;
 
 use serde::{Serialize, Deserialize};

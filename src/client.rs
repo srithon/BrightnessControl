@@ -7,8 +7,6 @@ use std::os::unix::net::UnixStream;
 
 use std::io::{BufRead, BufReader};
 
-use std::time::Duration;
-
 use crate::daemon::*;
 
 fn check_brightness(matches: &Matches) -> Result<Option<BrightnessChange>> {
