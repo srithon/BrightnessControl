@@ -188,7 +188,7 @@ impl FileUtils {
 
         let template_filepath = data_dir.join("config_template.toml");
 
-        let template_file = self.file_open_options.open(template_filepath)?;
+        let mut template_file = self.file_open_options.open(template_filepath)?;
 
         // this allows us to handle any errors in this section the same way
         let overwrite_template_result = (|| -> Result<()> {
@@ -198,7 +198,7 @@ impl FileUtils {
             // 2 bytes extra incase 'a' becomes double(/triple)-digits
             const BYTES_TO_READ: usize = 10;
 
-            let buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
+            let mut buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
 
             buffered_reader.fill_buf()?;
 
