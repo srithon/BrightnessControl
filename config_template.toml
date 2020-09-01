@@ -1,3 +1,7 @@
+# {}
+# ^ KEEP THIS IN THE TEMPLATE
+# You can delete it in your own config, but this should stay in the template
+
 # If set to false, uses xrandr --gamma when toggling the nightlight
 # If set to true, uses the redshift program instead of xrandr for the nightlight
 # However, the brightness will still be controlled by xrandr
