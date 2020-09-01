@@ -173,6 +173,65 @@ impl FileUtils {
         write_specified_displays_to_file(&mut displays_file, displays)?;
         Ok(())
     }
+
+    // checks if the header in the config template reads a different version
+    // than the current version of BrightnessControl
+    // if they do not match OR anything goes wrong during the check, overwrites
+    // the template with CONFIG_TEMPLATE
+    fn update_config_template(&self) -> Result<()> {
+        // read header of current template
+        let data_dir = self.project_directory.data_dir();
+
+        if !data_dir.exists() {
+            fs::create_dir_all(data_dir)?;
+        }
+
+        let template_filepath = data_dir.join("config_template.toml");
+
+        let template_file = self.file_open_options.open(template_filepath)?;
+
+        // this allows us to handle any errors in this section the same way
+        let overwrite_template_result = (|| -> Result<()> {
+            // we only have to read until the first newline
+            // # a.b.c
+            // 12345678
+            // 2 bytes extra incase 'a' becomes double(/triple)-digits
+            const BYTES_TO_READ: usize = 10;
+
+            let buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
+
+            buffered_reader.fill_buf()?;
+
+            if let Some(first_line) = buffered_reader.lines().nth(0) {
+                let first_line = first_line?;
+
+                const num_chars_to_ignore: usize = "# ".len();
+                // Strings from BufReader::lines do not include newlines at the
+                // end
+                let version_string = &first_line[num_chars_to_ignore..];
+
+                // compare to actual version string
+                if version_string.eq(env!("CARGO_PKG_VERSION")) {
+                    println!("Version strings match! \"{}\" and \"{}\"", version_string, env!("CARGO_PKG_VERSION"));
+                    return Ok(());
+                }
+            }
+
+            // the cause of this error is irrelevant, so it doesnt need a
+            // message
+            Err(Error::new(ErrorKind::Other, ""))
+        })();
+
+        // dont care about the cause
+        if let Err(_) = overwrite_template_result {
+            println!("OVERWRITING");
+            // overwrite
+            template_file.set_len(CONFIG_TEMPLATE.len() as u64)?;
+            write!(template_file, "{}", CONFIG_TEMPLATE)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
