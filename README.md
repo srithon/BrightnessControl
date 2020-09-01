@@ -42,9 +42,15 @@ When this is not enabled, each individual client message takes less time to proc
 
 The `xrandr` call will only fail if a display is *disconnected*, so even with `auto-reconfigure` enabled, the daemon will not automatically reconfigure when a new monitor is connected.
 
-For users that often disconnect and reconnect monitors, the [srandrd](https://github.com/jceb/srandrd) tool can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
+For users that often disconnect and reconnect monitors, two external options are the [autorandr](https://github.com/phillipberndt/autorandr) and [srandrd](https://github.com/jceb/srandrd) programs.
+
+Both programs can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
 
 This is a good alternative to `auto-reconfigure`, which also has the advantage of working when a new monitor is connected
+
+Instructions on how to configure these programs to work with this application will be added in the future.
+
+Instructions on how to enable/disable `auto-reconfigure` are in the Installation section
 
 ## Installation
 *From the project root*
