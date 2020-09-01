@@ -1,5 +1,6 @@
-# {}
+# v1.4.2
 # ^ KEEP THIS IN THE TEMPLATE
+# Every time the template is updated, the current version is put at the top
 # You can delete it in your own config, but this should stay in the template
 
 # If set to false, uses xrandr --gamma when toggling the nightlight
