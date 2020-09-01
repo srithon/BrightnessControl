@@ -231,6 +231,7 @@ impl FileUtils {
         if let Err(_) = overwrite_template_result {
             println!("OVERWRITING");
             // overwrite
+            template_file.seek(std::io::SeekFrom::Start(0))?;
             template_file.set_len(CONFIG_TEMPLATE.len() as u64)?;
             write!(template_file, "{}", CONFIG_TEMPLATE)?;
         }
