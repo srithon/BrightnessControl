@@ -67,9 +67,19 @@ It downloads the `rustup` installation script and pipes it into `sh`, which exec
 
 To read the script before it executes, you can redirect the output into a file by replacing `| sh` with `> filename.sh`. After reading `filename.sh`, you can execute it from there.
 
+**Alternatively**, you can download the `rustup` package from your distro's (most likely) official repositories.
+
 **Ubuntu**: `sudo apt install rustup`
 
 **Arch Linux**: `sudo pacman -S rustup`
+
+_With rustup installed_...
+```
+$ rustup toolchain install stable
+$ rustup default stable
+```
+
+This should install `cargo` for you.
 
 ## Runtime Dependencies
 1) `xrandr`
