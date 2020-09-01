@@ -214,11 +214,10 @@ impl FileUtils {
 
                 // compare to actual version string
                 if version_string.eq(current_version_string) {
-                    println!("Version strings match! \"{}\" and \"{}\"", version_string, current_version_string);
                     return Ok(());
                 }
                 else {
-                    println!("Version strings do not match! \"{}\" and \"{}\"", version_string, current_version_string);
+                    println!("Config template updated! \"{}\" to \"{}\"", version_string, current_version_string);
                 }
             }
 
@@ -229,7 +228,6 @@ impl FileUtils {
 
         // dont care about the cause
         if let Err(_) = overwrite_template_result {
-            println!("OVERWRITING");
             // overwrite
             template_file.seek(std::io::SeekFrom::Start(0))?;
             template_file.set_len(CONFIG_TEMPLATE.len() as u64)?;
