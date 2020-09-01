@@ -53,7 +53,7 @@ Instructions on how to configure these programs to work with this application wi
 Instructions on how to enable/disable `auto-reconfigure` are in the Installation section
 
 ## Build Dependencies
-**NOTE**: since `v1.4.1`, you can download pre-compiled binaries from GitHub releases. These binaries are packaged by Travis CI. If you do not want to download `Rust` (admittedly a pretty big dependency), you should consider downloading and using these binaries.
+**NOTE**: since `v1.4.1`, you can download pre-compiled binaries from [GitHub releases](https://github.com/srithon/BrightnessControl/releases). These binaries are packaged by Travis CI. If you do not want to download `Rust` (admittedly a pretty big dependency), you should consider downloading and using these binaries.
 
 1) `cargo`
 The easiest way to install `cargo` is through `rustup`: the Rust toolchain installer.
