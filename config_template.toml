@@ -1,0 +1,20 @@
+# If set to false, uses xrandr --gamma when toggling the nightlight
+# If set to true, uses the redshift program instead of xrandr for the nightlight
+# However, the brightness will still be controlled by xrandr
+# If you are using this option, make sure that you have followed the
+# instructions from the "Configuring Redshift" section of the README
+use_redshift = false
+
+# If set to false, the daemon will not wait to see if its xrandr updates are
+# returning normally
+# This allows the daemon to launch xrandr processes asynchronously, allowing the
+# daemon to process each individual client command faster
+# Calls to xrandr will fail if a monitor is disconnected without the display being reconfigured (brightness_control -c)
+# If set to true, the daemon will wait for each xrandr process to terminate
+# before processing the next client command
+# This means that successive xrandr calls will not fail
+#
+# HOWEVER, *connecting* a new display will not make xrandr throw an error
+# When connecting a new display, use `brightness_control -c` to apply settings
+# to that display
+auto_reconfigure = true
