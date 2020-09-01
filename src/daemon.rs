@@ -15,6 +15,12 @@ use std::cmp;
 
 pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
 
+// the template is used as a format string
+// it has a {} at the top of the file
+// this allows us to insert the current version at compile-time
+// this version is used to check if the template is out-of-date
+pub const CONFIG_TEMPLATE: &str = format!(include_str!("../config_template.toml"), env!("CARGO_PKG_VERSION"));
+
 pub fn get_bincode_options() -> DefaultOptions {
     let options = bincode::DefaultOptions::default();
     options.with_fixint_encoding();
