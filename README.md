@@ -56,6 +56,7 @@ Instructions on how to enable/disable `auto-reconfigure` are in the Installation
 **NOTE**: since `v1.4.1`, you can download pre-compiled binaries from [GitHub releases](https://github.com/srithon/BrightnessControl/releases). These binaries are packaged by Travis CI. If you do not want to download `Rust` (admittedly a pretty big dependency), you should consider downloading and using these binaries.
 
 1) `cargo`
+
 The easiest way to install `cargo` is through `rustup`: the Rust toolchain installer.
 
 The following command is taken directly from the [cargo installation page](https://doc.rust-lang.org/cargo/getting-started/installation.html).
@@ -67,17 +68,22 @@ It downloads the `rustup` installation script and pipes it into `sh`, which exec
 To read the script before it executes, you can redirect the output into a file by replacing `| sh` with `> filename.sh`. After reading `filename.sh`, you can execute it from there.
 
 **Ubuntu**: `sudo apt install rustup`
+
 **Arch Linux**: `sudo pacman -S rustup`
 
 ## Runtime Dependencies
 1) `xrandr`
+
 `xrandr` may already be installed on your computer. Type `xrandr` into your shell to check.
 
 **Ubuntu**: `sudo apt install x11-xserver-utils `
+
 **Arch Linux**: `sudo pacman -S xorg-xrandr`
 
 2) `redshift` (optional)
+
 **Ubuntu**: `sudo apt install redshift`
+
 **Arch Linux**: `sudo pacman -S redshift`
 
 Source: [https://github.com/jonls/redshift](https://github.com/jonls/redshift)
