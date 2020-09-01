@@ -201,15 +201,24 @@ impl FileUtils {
             if let Some(first_line) = buffered_reader.lines().nth(0) {
                 let first_line = first_line?;
 
-                const num_chars_to_ignore: usize = "# ".len();
+                const NUM_CHARS_TO_IGNORE: usize = "# v".len();
                 // Strings from BufReader::lines do not include newlines at the
                 // end
-                let version_string = &first_line[num_chars_to_ignore..];
+                let version_string = &first_line[NUM_CHARS_TO_IGNORE..];
+
+                let current_version_string = {
+                    let beginning_trimmed = &CONFIG_TEMPLATE[NUM_CHARS_TO_IGNORE..];
+                    let newline_index = beginning_trimmed.find("\n").unwrap();
+                    &beginning_trimmed[..newline_index]
+                };
 
                 // compare to actual version string
-                if version_string.eq(env!("CARGO_PKG_VERSION")) {
-                    println!("Version strings match! \"{}\" and \"{}\"", version_string, env!("CARGO_PKG_VERSION"));
+                if version_string.eq(current_version_string) {
+                    println!("Version strings match! \"{}\" and \"{}\"", version_string, current_version_string);
                     return Ok(());
+                }
+                else {
+                    println!("Version strings do not match! \"{}\" and \"{}\"", version_string, current_version_string);
                 }
             }
 
