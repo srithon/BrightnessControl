@@ -276,6 +276,8 @@ impl Daemon {
             file_open_options
         };
 
+        file_utils.update_config_template()?;
+
         let config: DaemonOptions = {
             let configuration: DaemonOptions = (|| {
                 let (mut config_file, file_existed) = file_utils.open_configuration_file()?;
