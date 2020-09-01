@@ -42,9 +42,45 @@ When this is not enabled, each individual client message takes less time to proc
 
 The `xrandr` call will only fail if a display is *disconnected*, so even with `auto-reconfigure` enabled, the daemon will not automatically reconfigure when a new monitor is connected.
 
-For users that often disconnect and reconnect monitors, the [srandrd](https://github.com/jceb/srandrd) tool can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
+For users that often disconnect and reconnect monitors, two external options are the [autorandr](https://github.com/phillipberndt/autorandr) and [srandrd](https://github.com/jceb/srandrd) programs.
+
+Both programs can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
 
 This is a good alternative to `auto-reconfigure`, which also has the advantage of working when a new monitor is connected
+
+Instructions on how to configure these programs to work with this application will be added in the future.
+
+Instructions on how to enable/disable `auto-reconfigure` are in the Installation section
+
+## Build Dependencies
+**NOTE**: since `v1.4.1`, you can download pre-compiled binaries from [GitHub releases](https://github.com/srithon/BrightnessControl/releases). These binaries are packaged by Travis CI. If you do not want to download `Rust` (admittedly a pretty big dependency), you should consider downloading and using these binaries.
+
+1) `cargo`
+The easiest way to install `cargo` is through `rustup`: the Rust toolchain installer.
+
+The following command is taken directly from the [cargo installation page](https://doc.rust-lang.org/cargo/getting-started/installation.html).
+
+It downloads the `rustup` installation script and pipes it into `sh`, which executes it directly.
+
+`$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+To read the script before it executes, you can redirect the output into a file by replacing `| sh` with `> filename.sh`. After reading `filename.sh`, you can execute it from there.
+
+**Ubuntu**: `sudo apt install rustup`
+**Arch Linux**: `sudo pacman -S rustup`
+
+## Runtime Dependencies
+1) `xrandr`
+`xrandr` may already be installed on your computer. Type `xrandr` into your shell to check.
+
+**Ubuntu**: `sudo apt install x11-xserver-utils `
+**Arch Linux**: `sudo pacman -S xorg-xrandr`
+
+2) `redshift` (optional)
+**Ubuntu**: `sudo apt install redshift`
+**Arch Linux**: `sudo pacman -S redshift`
+
+Source: [https://github.com/jonls/redshift](https://github.com/jonls/redshift)
 
 ## Installation
 *From the project root*
