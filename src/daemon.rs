@@ -296,7 +296,7 @@ impl Daemon {
                     overwrite_file_with_content(&mut config_file, CONFIG_TEMPLATE)?;
                 }
 
-                let config = get_configuration_from_file(&mut config_file)?;
+                let config = DaemonOptions::default();
 
                 // saves creating another instance of DaemonOptions::default()
                 return Ok(config);
