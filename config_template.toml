@@ -38,4 +38,4 @@ total_duration = 400
 #
 # if you divide "fade_duration" by "fade_step_duration", you get the total
 # number of individual steps over the course of each fade
-step_duration = 10
+step_duration = 20
