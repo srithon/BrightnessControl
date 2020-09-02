@@ -65,6 +65,7 @@ dependencies = [
  "daemonize",
  "directories",
  "getopts",
+ "lazy_static",
  "serde",
  "signal-hook",
  "toml",
