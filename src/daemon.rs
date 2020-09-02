@@ -2,6 +2,8 @@ use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
+use lazy_static::lazy_static;
+
 use serde::{Serialize, Deserialize};
 
 use std::os::unix::net::{UnixStream, UnixListener};
@@ -16,6 +18,13 @@ use std::cmp;
 pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
 
 pub const CONFIG_TEMPLATE: &str = include_str!("../config_template.toml");
+
+lazy_static! {
+    static ref DEFAULT_CONFIG: DaemonOptions = {
+        let parsed_toml: DaemonOptions = toml::from_slice(CONFIG_TEMPLATE.as_bytes()).unwrap();
+        parsed_toml
+    };
+}
 
 pub fn get_bincode_options() -> DefaultOptions {
     let options = bincode::DefaultOptions::default();
