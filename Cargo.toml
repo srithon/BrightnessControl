@@ -1,6 +1,6 @@
 [package]
 name = "brightness_control"
-version = "1.4.3"
+version = "1.4.4"
 authors = ["Sridaran Thoniyil <sri7thon@gmail.com>"]
 edition = "2018"
 

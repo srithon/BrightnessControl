@@ -22,7 +22,8 @@ fn get_cli_interface() -> Options {
         .optflag("q", "quiet", "Do not wait for the Daemon's output before terminating")
         .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
         .optopt("i", "increment", "Increments the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
-        .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE");
+        .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
+        .optopt("g", "get", "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'", "PROPERTY");
     options
 }
 
