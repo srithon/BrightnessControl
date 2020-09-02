@@ -856,7 +856,7 @@ fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Re
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift, auto_reconfigure);
+    overwrite_values!(use_redshift, auto_reconfigure, fade_options);
 
     return Ok(config);
 }
