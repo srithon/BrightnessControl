@@ -39,8 +39,17 @@ pub enum BrightnessChange {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum GetProperty {
+    Brightness,
+    Mode,
+    Displays,
+    Config
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
+    get_property: Option<GetProperty>,
     configure_display: bool,
     toggle_nightlight: bool,
     reload_configuration: bool,
@@ -48,9 +57,10 @@ pub struct ProgramInput {
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessChange>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
+    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
         ProgramInput {
             brightness,
+            get_property,
             configure_display,
             toggle_nightlight,
             reload_configuration,
