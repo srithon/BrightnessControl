@@ -633,15 +633,13 @@ impl Daemon {
         Ok(())
     }
 
-    fn create_xrandr_command(&self) -> Command {
+    fn create_xrandr_command_with_brightness(&self, brightness_string: String) -> Command {
         let mut xrandr_call = Command::new("xrandr");
 
         for display in &self.displays {
             xrandr_call.arg("--output");
             xrandr_call.arg(display);
         }
-
-        let brightness_string = format!("{:.2}", *(&self.brightness) as f32 / 100.0);
 
         xrandr_call.arg("--brightness")
             .arg(brightness_string);
@@ -655,6 +653,12 @@ impl Daemon {
         }
 
         xrandr_call
+
+    }
+
+    fn create_xrandr_command(&self) -> Command {
+        let brightness_string = format!("{:.2}", *(&self.brightness) as f32 / 100.0);
+        self.create_xrandr_command_with_brightness(brightness_string)
     }
 }
 
