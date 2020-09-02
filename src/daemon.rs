@@ -2,6 +2,8 @@ use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
+use lazy_static::lazy_static;
+
 use serde::{Serialize, Deserialize};
 
 use std::os::unix::net::{UnixStream, UnixListener};
@@ -14,6 +16,15 @@ use std::process::Command;
 use std::cmp;
 
 pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
+
+pub const CONFIG_TEMPLATE: &str = include_str!("../config_template.toml");
+
+lazy_static! {
+    static ref DEFAULT_CONFIG: DaemonOptions = {
+        let parsed_toml: DaemonOptions = toml::from_slice(CONFIG_TEMPLATE.as_bytes()).unwrap();
+        parsed_toml
+    };
+}
 
 pub fn get_bincode_options() -> DefaultOptions {
     let options = bincode::DefaultOptions::default();
@@ -167,9 +178,80 @@ impl FileUtils {
         write_specified_displays_to_file(&mut displays_file, displays)?;
         Ok(())
     }
+
+    // checks if the header in the config template reads a different version
+    // than the current version of BrightnessControl
+    // if they do not match OR anything goes wrong during the check, overwrites
+    // the template with CONFIG_TEMPLATE
+    fn update_config_template(&self) -> Result<()> {
+        // read header of current template
+        let data_dir = self.project_directory.data_dir();
+
+        if !data_dir.exists() {
+            fs::create_dir_all(data_dir)?;
+        }
+
+        let template_filepath = data_dir.join("config_template.toml");
+        let template_exists = template_filepath.exists();
+
+        let mut template_file = self.file_open_options.open(&template_filepath)?;
+
+        // this allows us to handle any errors in this section the same way
+        let overwrite_template_result = (|| -> Result<()> {
+            if template_exists {
+                // we only have to read until the first newline
+                // # a.b.c
+                // 12345678
+                // 2 bytes extra incase 'a' becomes double(/triple)-digits
+                const BYTES_TO_READ: usize = 20;
+
+                let mut buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
+
+                buffered_reader.fill_buf()?;
+
+                if let Some(first_line) = buffered_reader.lines().nth(0) {
+                    let first_line = first_line?;
+
+                    const NUM_CHARS_TO_IGNORE: usize = "# v".len();
+                    // Strings from BufReader::lines do not include newlines at the
+                    // end
+                    let version_string = &first_line[NUM_CHARS_TO_IGNORE..];
+
+                    let current_version_string = {
+                        let beginning_trimmed = &CONFIG_TEMPLATE[NUM_CHARS_TO_IGNORE..];
+                        let newline_index = beginning_trimmed.find("\n").unwrap();
+                        &beginning_trimmed[..newline_index]
+                    };
+
+                    // compare to actual version string
+                    if version_string.eq(current_version_string) {
+                        return Ok(());
+                    }
+                    else {
+                        println!("Config template updated! \"{}\" to \"{}\"", version_string, current_version_string);
+                    }
+                }
+            }
+            else {
+                println!("Config template saved to {}", &template_filepath.display());
+            }
+
+            // the cause of this error is irrelevant, so it doesnt need a
+            // message
+            Err(Error::new(ErrorKind::Other, ""))
+        })();
+
+        // dont care about the cause
+        if let Err(_) = overwrite_template_result {
+            // overwrite
+            overwrite_file_with_content(&mut template_file, CONFIG_TEMPLATE)?;
+        }
+
+        Ok(())
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct DaemonOptions {
     use_redshift: bool,
     auto_reconfigure: bool
@@ -177,10 +259,7 @@ struct DaemonOptions {
 
 impl DaemonOptions {
     fn default() -> DaemonOptions {
-        DaemonOptions {
-            use_redshift: false,
-            auto_reconfigure: true
-        }
+        (*DEFAULT_CONFIG).clone()
     }
 }
 
@@ -207,8 +286,10 @@ impl Daemon {
             file_open_options
         };
 
+        file_utils.update_config_template()?;
+
         let config: DaemonOptions = {
-            let configuration: DaemonOptions = (|| {
+            let configuration: DaemonOptions = (|| -> Result<DaemonOptions> {
                 let (mut config_file, file_existed) = file_utils.open_configuration_file()?;
 
                 // file exists
@@ -218,22 +299,13 @@ impl Daemon {
                     }
                 }
                 else {
-                    // write defaults to config file
-                    let defaults = DaemonOptions::default();
-                    let serialized_defaults = match toml::to_string_pretty(&defaults) {
-                        Ok(serialized_defaults) => serialized_defaults,
-                        Err(error) => {
-                            return Err(Error::new(ErrorKind::InvalidData, format!("{}", error)));
-                        }
-                    };
-
-                    overwrite_file_with_content(&mut config_file, serialized_defaults)?;
-
-                    // saves creating another instance of DaemonOptions::default()
-                    return Ok(defaults);
+                    overwrite_file_with_content(&mut config_file, CONFIG_TEMPLATE)?;
                 }
 
-                Ok(DaemonOptions::default())
+                let config = DaemonOptions::default();
+
+                // saves creating another instance of DaemonOptions::default()
+                return Ok(config);
             })()?;
 
             configuration
@@ -305,7 +377,7 @@ impl Daemon {
         for stream in listener.incoming() {
             match stream {
                 Ok(mut stream) => {
-                    let stream_reader = BufReader::new(&mut stream);
+                    let stream_reader = BufReader::with_capacity(20 as usize, &mut stream);
                     // Rust is amazing
                     // the compiler figured out the type of program_input based on the call to
                     // self.process_input 5 lines below

@@ -170,6 +170,11 @@ $ brightness_control --daemon
 $ brightness_control --help
 ```
 
+_To Print Out the Current Configuration Template_
+```
+$ brightness_control --print-config-template
+```
+
 *To Reload the Daemon Configuration*
 ```
 $ brightness_control --reload-configuration
@@ -179,9 +184,19 @@ $ brightness_control --reload-configuration
 `BrightnessControl`'s reads its runtime configuration from `~/.config/brightnesscontrol/config.toml`
 If the file does not exist when the daemon is started, it automatically creates the file and writes the default configuration.
 
-After that, you can reload the configuration without restarting the daemon by running `brightness_control --reload-configuration` as shown above.
+The default configuration template is stored in `~/.local/share/brightnesscontrol/config_template.toml`
+
+The daemon writes the template to disk when it is first started. To do this manually, copy the output of `brightness_control --print-config-template` to the file.
+
+Whenever the daemon is started, it checks to see if the configuration template is out of date. If it is, then it overwrites it with the current template.
+
+When the daemon overwrites the template, it will indicate this through stdout. `BrightnessControl` will never overwrite your personal configuration, so whenever new options are added to the template, they have to be copied over manually.
+
+You can reload the configuration without restarting the daemon by running `brightness_control --reload-configuration` as shown above.
 
 If the file cannot be parsed, the client will print out the error.
+
+All available options are documented in the template
 
 ## Keybinding
 All of these commands can be bound to keybindings for ease-of-use.
