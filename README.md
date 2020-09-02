@@ -175,6 +175,16 @@ _To Print Out the Current Configuration Template_
 $ brightness_control --print-config-template
 ```
 
+_To Print Out the Current Brightness_
+```
+$ brightness_control --get brightness
+```
+
+_To Print Out the Currently Loaded Configuration_
+```
+$ brightness_control --get config
+```
+
 *To Reload the Daemon Configuration*
 ```
 $ brightness_control --reload-configuration
