@@ -247,7 +247,7 @@ impl FileUtils {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct DaemonOptions {
     use_redshift: bool,
     auto_reconfigure: bool
@@ -255,10 +255,7 @@ struct DaemonOptions {
 
 impl DaemonOptions {
     fn default() -> DaemonOptions {
-        DaemonOptions {
-            use_redshift: false,
-            auto_reconfigure: true
-        }
+        (*DEFAULT_CONFIG).clone()
     }
 }
 
