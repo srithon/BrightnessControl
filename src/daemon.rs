@@ -279,7 +279,7 @@ impl Daemon {
         file_utils.update_config_template()?;
 
         let config: DaemonOptions = {
-            let configuration: DaemonOptions = (|| {
+            let configuration: DaemonOptions = (|| -> Result<DaemonOptions> {
                 let (mut config_file, file_existed) = file_utils.open_configuration_file()?;
 
                 // file exists
@@ -289,22 +289,13 @@ impl Daemon {
                     }
                 }
                 else {
-                    // write defaults to config file
-                    let defaults = DaemonOptions::default();
-                    let serialized_defaults = match toml::to_string_pretty(&defaults) {
-                        Ok(serialized_defaults) => serialized_defaults,
-                        Err(error) => {
-                            return Err(Error::new(ErrorKind::InvalidData, format!("{}", error)));
-                        }
-                    };
-
-                    overwrite_file_with_content(&mut config_file, serialized_defaults)?;
-
-                    // saves creating another instance of DaemonOptions::default()
-                    return Ok(defaults);
+                    overwrite_file_with_content(&mut config_file, CONFIG_TEMPLATE)?;
                 }
 
-                Ok(DaemonOptions::default())
+                let config = get_configuration_from_file(&mut config_file)?;
+
+                // saves creating another instance of DaemonOptions::default()
+                return Ok(config);
             })()?;
 
             configuration
