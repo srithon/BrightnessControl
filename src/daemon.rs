@@ -238,9 +238,7 @@ impl FileUtils {
         // dont care about the cause
         if let Err(_) = overwrite_template_result {
             // overwrite
-            template_file.seek(std::io::SeekFrom::Start(0))?;
-            template_file.set_len(CONFIG_TEMPLATE.len() as u64)?;
-            write!(template_file, "{}", CONFIG_TEMPLATE)?;
+            overwrite_file_with_content(&mut template_file, CONFIG_TEMPLATE)?;
         }
 
         Ok(())
