@@ -482,6 +482,7 @@ impl Daemon {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
         let brightness = program_input.brightness;
+        let get_property = program_input.get_property;
         let toggle_nightlight = program_input.toggle_nightlight;
         let mut configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
@@ -547,6 +548,25 @@ impl Daemon {
                 };
             },
             None => ()
+        };
+
+        if let Some(property) = get_property {
+            let property_value = match property {
+                GetProperty::Brightness => {
+                    format!("{}", &self.brightness)
+                },
+                GetProperty::Displays => {
+                    self.displays.join(" ")
+                },
+                GetProperty::Mode => {
+                    format!("{}", self.mode as i32)
+                },
+                GetProperty::Config => {
+                    format!("{:?}", &self.config)
+                }
+            };
+
+            write_message(&property_value);
         };
 
         if configure_display {
@@ -790,6 +810,7 @@ fn register_sigterm_handler() -> Result<()> {
                     Ok(mut sock) => {
                         let mock_save_daemon_input = ProgramInput {
                             brightness: None,
+                            get_property: None,
                             toggle_nightlight: false,
                             configure_display: false,
                             reload_configuration: false,
