@@ -371,7 +371,7 @@ impl Daemon {
         for stream in listener.incoming() {
             match stream {
                 Ok(mut stream) => {
-                    let stream_reader = BufReader::new(&mut stream);
+                    let stream_reader = BufReader::with_capacity(20 as usize, &mut stream);
                     // Rust is amazing
                     // the compiler figured out the type of program_input based on the call to
                     // self.process_input 5 lines below
