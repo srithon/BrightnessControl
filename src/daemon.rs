@@ -534,28 +534,80 @@ impl Daemon {
 
         match brightness {
             Some(brightness_change) => {
-                self.brightness = match brightness_change {
+                let new_brightness = match brightness_change {
                     BrightnessChange::Set(new_brightness) => new_brightness,
                     BrightnessChange::Adjustment(brightness_shift) => {
                         cmp::max(cmp::min(brightness_shift + (self.brightness as i8), 100), 0) as u8
                     }
                 };
 
-                // this returns true if refresh_brightness reconfigured the display automatically
-                // dont want to reconfigure AGAIN
-                match self.refresh_brightness() {
-                    Ok(skip_configure_display) => {
-                        write_message(&format!("Set brightness to {}%", self.brightness));
+                let total_brightness_shift = (new_brightness as i8) - (self.brightness as i8);
 
-                        if skip_configure_display {
-                            configure_display = false;
-                            write_message("Automatically reconfigured displays!");
+                let fade_options = &self.config.fade_options;
+
+                if (total_brightness_shift.abs()) as u8 <= fade_options.threshold {
+                    self.brightness = new_brightness;
+
+                    // this returns true if refresh_brightness reconfigured the display automatically
+                    // dont want to reconfigure AGAIN
+                    match self.refresh_brightness() {
+                        Ok(skip_configure_display) => {
+                            write_message(&format!("Set brightness to {}%", self.brightness));
+
+                            if skip_configure_display {
+                                configure_display = false;
+                                write_message("Automatically reconfigured displays!");
+                            }
+                        },
+                        Err(e) => {
+                            write_message(&format!("Failed to refresh brightness: {}", e));
                         }
-                    },
-                    Err(e) => {
-                        write_message(&format!("Failed to refresh brightness: {}", e));
+                    };
+                }
+                else {
+                    // fade
+                    let mut current_brightness = self.brightness as f32;
+
+                    let total_num_steps = fade_options.total_duration / fade_options.step_duration;
+
+                    let brightness_step = (total_brightness_shift as f32) / (total_num_steps as f32);
+
+                    // the last step is dedicated to setting the brightness exactly to
+                    // new_brightness
+                    // if we only went by adding brightness_step, we would not end up exactly where
+                    // we wanted to be
+                    let iterator_num_steps = total_num_steps - 1;
+
+                    let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
+
+                    if let Ok(true) = self.refresh_brightness() {
+                        configure_display = false;
                     }
-                };
+
+                    for _ in 0..iterator_num_steps {
+                        current_brightness += brightness_step;
+
+                        let brightness_string = format!("{:.5}", current_brightness / 100.0);
+
+                        let mut command = self.create_xrandr_command_with_brightness(brightness_string);
+                        if let Err(e) = command.spawn() {
+                            write_message(&format!("Failed to set brightness during fade: {}", e));
+                        };
+
+                        std::thread::sleep(fade_step_delay);
+                    }
+
+                    self.brightness = new_brightness;
+
+                    match self.refresh_brightness() {
+                        Ok(_) => {
+                            write_message(&format!("Completed fade to brightness: {}", new_brightness));
+                        }
+                        Err(e) => {
+                            write_message(&format!("Failed to complete fade: {}", e));
+                        }
+                    }
+                }
             },
             None => ()
         };
