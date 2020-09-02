@@ -71,11 +71,30 @@ fn check_brightness(matches: &Matches) -> Result<Option<BrightnessChange>> {
     result
 }
 
+fn check_get_property(matches: &Matches) -> Option<GetProperty> {
+    if let Some(get_argument) = matches.opt_str("get") {
+        if let Some(mut first_char) = get_argument.chars().nth(0) {
+            first_char.make_ascii_lowercase();
+            return match first_char {
+                'b' => Some(GetProperty::Brightness),
+                'm' => Some(GetProperty::Mode),
+                'd' => Some(GetProperty::Displays),
+                'c' => Some(GetProperty::Config),
+                _ => None
+            }
+        }
+    }
+
+    None
+}
+
 pub fn handle_input(matches: Matches) -> Result<()> {
     let brightness = check_brightness(&matches)?;
+    let get_property = check_get_property(&matches);
 
     let program_input = ProgramInput::new(
         brightness,
+        get_property,
         matches.opt_present("configure-display"),
         matches.opt_present("toggle-nightlight"),
         matches.opt_present("reload-configuration"),
