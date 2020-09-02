@@ -18,6 +18,7 @@ fn get_cli_interface() -> Options {
         .optflag("c", "configure-display", "Uses the current display configuration for future calls to BrightnessControl")
         .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
         .optflag("r", "reload-configuration", "Tells the daemon to re-read the configuration file and apply new changes")
+        .optflag("", "print-default-config", "Prints out the default configuration template")
         .optflag("q", "quiet", "Do not wait for the Daemon's output before terminating")
         .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
         .optopt("i", "increment", "Increments the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
@@ -58,6 +59,9 @@ fn main() -> Result<()> {
     }
     else if matches.opt_present("version") {
         println!("BrightnessControl {}", env!("CARGO_PKG_VERSION"));
+    }
+    else if matches.opt_present("print-default-config") {
+        println!("{}", daemon::CONFIG_TEMPLATE);
     }
     else if matches.opt_present("daemon") {
         // START DAEMON
