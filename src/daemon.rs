@@ -594,7 +594,10 @@ impl Daemon {
                             write_message(&format!("Failed to set brightness during fade: {}", e));
                         };
 
-                        std::thread::sleep(fade_step_delay);
+                        // spin_sleep is more accurate than regular std::thread::sleep
+                        // we want our fades to be smooth, so the delay for each one must be as
+                        // consistent as possible
+                        spin_sleep::sleep(fade_step_delay);
                     }
 
                     self.brightness = new_brightness;
