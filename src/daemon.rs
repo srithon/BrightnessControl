@@ -192,42 +192,48 @@ impl FileUtils {
         }
 
         let template_filepath = data_dir.join("config_template.toml");
+        let template_exists = template_filepath.exists();
 
-        let mut template_file = self.file_open_options.open(template_filepath)?;
+        let mut template_file = self.file_open_options.open(&template_filepath)?;
 
         // this allows us to handle any errors in this section the same way
         let overwrite_template_result = (|| -> Result<()> {
-            // we only have to read until the first newline
-            // # a.b.c
-            // 12345678
-            // 2 bytes extra incase 'a' becomes double(/triple)-digits
-            const BYTES_TO_READ: usize = 10;
+            if template_exists {
+                // we only have to read until the first newline
+                // # a.b.c
+                // 12345678
+                // 2 bytes extra incase 'a' becomes double(/triple)-digits
+                const BYTES_TO_READ: usize = 20;
 
-            let mut buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
+                let mut buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
 
-            buffered_reader.fill_buf()?;
+                buffered_reader.fill_buf()?;
 
-            if let Some(first_line) = buffered_reader.lines().nth(0) {
-                let first_line = first_line?;
+                if let Some(first_line) = buffered_reader.lines().nth(0) {
+                    let first_line = first_line?;
 
-                const NUM_CHARS_TO_IGNORE: usize = "# v".len();
-                // Strings from BufReader::lines do not include newlines at the
-                // end
-                let version_string = &first_line[NUM_CHARS_TO_IGNORE..];
+                    const NUM_CHARS_TO_IGNORE: usize = "# v".len();
+                    // Strings from BufReader::lines do not include newlines at the
+                    // end
+                    let version_string = &first_line[NUM_CHARS_TO_IGNORE..];
 
-                let current_version_string = {
-                    let beginning_trimmed = &CONFIG_TEMPLATE[NUM_CHARS_TO_IGNORE..];
-                    let newline_index = beginning_trimmed.find("\n").unwrap();
-                    &beginning_trimmed[..newline_index]
-                };
+                    let current_version_string = {
+                        let beginning_trimmed = &CONFIG_TEMPLATE[NUM_CHARS_TO_IGNORE..];
+                        let newline_index = beginning_trimmed.find("\n").unwrap();
+                        &beginning_trimmed[..newline_index]
+                    };
 
-                // compare to actual version string
-                if version_string.eq(current_version_string) {
-                    return Ok(());
+                    // compare to actual version string
+                    if version_string.eq(current_version_string) {
+                        return Ok(());
+                    }
+                    else {
+                        println!("Config template updated! \"{}\" to \"{}\"", version_string, current_version_string);
+                    }
                 }
-                else {
-                    println!("Config template updated! \"{}\" to \"{}\"", version_string, current_version_string);
-                }
+            }
+            else {
+                println!("Config template saved to {}", &template_filepath.display());
             }
 
             // the cause of this error is irrelevant, so it doesnt need a
