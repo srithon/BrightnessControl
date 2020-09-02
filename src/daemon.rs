@@ -262,9 +262,19 @@ impl FileUtils {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct FadeOptions {
+    threshold: u8,
+    // milliseconds
+    total_duration: u32,
+    // milliseconds
+    step_duration: u32
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct DaemonOptions {
     use_redshift: bool,
-    auto_reconfigure: bool
+    auto_reconfigure: bool,
+    fade_options: FadeOptions
 }
 
 impl DaemonOptions {
