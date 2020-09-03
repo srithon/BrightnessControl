@@ -19,6 +19,8 @@ fn get_cli_interface() -> Options {
         .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
         .optflag("r", "reload-configuration", "Tells the daemon to re-read the configuration file and apply new changes")
         .optflag("", "print-default-config", "Prints out the default configuration template")
+        .optflag("", "fade", "Overrides the auto-fade functionality and fades regardless of the current configuration")
+        .optflag("", "no-fade", "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
         .optflag("q", "quiet", "Do not wait for the Daemon's output before terminating")
         .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
         .optopt("i", "increment", "Increments the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
