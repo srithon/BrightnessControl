@@ -11,7 +11,9 @@ use std::os::unix::net::{UnixStream, UnixListener};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, Write, Read, Result};
 use std::fmt::Display;
-use std::process::Command;
+use std::process::{Command, Child};
+
+use std::collections::VecDeque;
 
 use std::cmp;
 
@@ -290,6 +292,8 @@ struct Daemon {
     mode: bool,
     displays: Vec<String>,
     config: DaemonOptions,
+    // VecDeque for FIFO
+    child_processes: VecDeque<Child>,
     file_utils: FileUtils
 }
 
@@ -340,6 +344,7 @@ impl Daemon {
                 brightness: file_utils.get_written_brightness()?,
                 mode: file_utils.get_written_mode()?,
                 displays: file_utils.get_written_displays()?,
+                child_processes: Vec::new(),
                 config,
                 file_utils
             }
