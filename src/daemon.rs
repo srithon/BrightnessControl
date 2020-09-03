@@ -50,6 +50,7 @@ pub enum GetProperty {
 pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
     get_property: Option<GetProperty>,
+    override_fade: Option<bool>,
     configure_display: bool,
     toggle_nightlight: bool,
     reload_configuration: bool,
@@ -57,10 +58,11 @@ pub struct ProgramInput {
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
+    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, override_fade: Option<bool>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
         ProgramInput {
             brightness,
             get_property,
+            override_fade,
             configure_display,
             toggle_nightlight,
             reload_configuration,
@@ -262,9 +264,19 @@ impl FileUtils {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct FadeOptions {
+    threshold: u8,
+    // milliseconds
+    total_duration: u32,
+    // milliseconds
+    step_duration: u32
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct DaemonOptions {
     use_redshift: bool,
-    auto_reconfigure: bool
+    auto_reconfigure: bool,
+    fade_options: FadeOptions
 }
 
 impl DaemonOptions {
@@ -483,16 +495,34 @@ impl Daemon {
         // struct elements
         let brightness = program_input.brightness;
         let get_property = program_input.get_property;
+        let fade = program_input.override_fade;
         let toggle_nightlight = program_input.toggle_nightlight;
         let mut configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
         let save_configuration = program_input.save_configuration;
 
-        let mut write_message = move |message: &str| {
+        let mut write_message = move |message: &str, log_socket_error: bool| {
             if let Err(e) = socket.write_all(message.as_bytes()) {
-                eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                if log_socket_error {
+                    eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                }
             }
         };
+
+        // have to use macros for these two because if they were closures they would need to share
+        // a mutable reference to the write_message closure, which the borrow checker
+        // would not allow
+        macro_rules! write_success {
+            ($message:expr) => {
+                write_message($message, false);
+            }
+        }
+
+        macro_rules! write_error {
+            ($message:expr) => {
+                write_message($message, true);
+            }
+        }
 
         if toggle_nightlight {
             self.mode = !self.mode;
@@ -500,13 +530,13 @@ impl Daemon {
             (|| {
                 if self.config.use_redshift {
                     if let Err(e) = self.refresh_redshift() {
-                        write_message(&format!("Failed to refresh redshift: {}", e));
+                        write_error!(&format!("Failed to refresh redshift: {}", e));
                         return;
                     }
                 }
                 else {
                     if let Err(e) = self.refresh_brightness() {
-                        write_message(&format!("Failed to refresh xrandr: {}", e));
+                        write_error!(&format!("Failed to refresh xrandr: {}", e));
                         return;
                     }
                 }
@@ -514,38 +544,104 @@ impl Daemon {
                 // could have used format! to make this a one-liner, but this allows the strings to be
                 // stored in static memory instead of having to be generated at runtime
                 if self.mode {
-                    write_message("Enabled nightlight");
+                    write_error!("Enabled nightlight");
                 }
                 else {
-                    write_message("Disabled nightlight");
+                    write_error!("Disabled nightlight");
                 }
             })()
         }
 
         match brightness {
             Some(brightness_change) => {
-                self.brightness = match brightness_change {
+                let new_brightness = match brightness_change {
                     BrightnessChange::Set(new_brightness) => new_brightness,
                     BrightnessChange::Adjustment(brightness_shift) => {
                         cmp::max(cmp::min(brightness_shift + (self.brightness as i8), 100), 0) as u8
                     }
                 };
 
-                // this returns true if refresh_brightness reconfigured the display automatically
-                // dont want to reconfigure AGAIN
-                match self.refresh_brightness() {
-                    Ok(skip_configure_display) => {
-                        write_message(&format!("Set brightness to {}%", self.brightness));
+                let total_brightness_shift = (new_brightness as i8) - (self.brightness as i8);
 
-                        if skip_configure_display {
-                            configure_display = false;
-                            write_message("Automatically reconfigured displays!");
-                        }
-                    },
-                    Err(e) => {
-                        write_message(&format!("Failed to refresh brightness: {}", e));
+                let fade_options = &self.config.fade_options;
+
+                let fade = {
+                    // if it contains a value, use it
+                    if let Some(fade) = fade {
+                        fade
+                    }
+                    else {
+                        // if there is no override, then do the auto check
+                        (total_brightness_shift.abs()) as u8 > fade_options.threshold 
                     }
                 };
+
+                if !fade {
+                    self.brightness = new_brightness;
+
+                    // this returns true if refresh_brightness reconfigured the display automatically
+                    // dont want to reconfigure AGAIN
+                    match self.refresh_brightness() {
+                        Ok(skip_configure_display) => {
+                            write_error!(&format!("Set brightness to {}%", self.brightness));
+
+                            if skip_configure_display {
+                                configure_display = false;
+                                write_error!("Automatically reconfigured displays!");
+                            }
+                        },
+                        Err(e) => {
+                            write_error!(&format!("Failed to refresh brightness: {}", e));
+                        }
+                    };
+                }
+                else {
+                    // fade
+                    let mut current_brightness = self.brightness as f32;
+
+                    let total_num_steps = fade_options.total_duration / fade_options.step_duration;
+
+                    let brightness_step = (total_brightness_shift as f32) / (total_num_steps as f32);
+
+                    // the last step is dedicated to setting the brightness exactly to
+                    // new_brightness
+                    // if we only went by adding brightness_step, we would not end up exactly where
+                    // we wanted to be
+                    let iterator_num_steps = total_num_steps - 1;
+
+                    let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
+
+                    if let Ok(true) = self.refresh_brightness() {
+                        configure_display = false;
+                    }
+
+                    for _ in 0..iterator_num_steps {
+                        current_brightness += brightness_step;
+
+                        let brightness_string = format!("{:.5}", current_brightness / 100.0);
+
+                        let mut command = self.create_xrandr_command_with_brightness(brightness_string);
+                        if let Err(e) = command.spawn() {
+                            write_error!(&format!("Failed to set brightness during fade: {}", e));
+                        };
+
+                        // spin_sleep is more accurate than regular std::thread::sleep
+                        // we want our fades to be smooth, so the delay for each one must be as
+                        // consistent as possible
+                        spin_sleep::sleep(fade_step_delay);
+                    }
+
+                    self.brightness = new_brightness;
+
+                    match self.refresh_brightness() {
+                        Ok(_) => {
+                            write_success!(&format!("Completed fade to brightness: {}", new_brightness));
+                        }
+                        Err(e) => {
+                            write_error!(&format!("Failed to complete fade: {}", e));
+                        }
+                    }
+                }
             },
             None => ()
         };
@@ -566,15 +662,15 @@ impl Daemon {
                 }
             };
 
-            write_message(&property_value);
+            write_success!(&property_value);
         };
 
         if configure_display {
             if let Err(e) = self.reconfigure_displays() {
-                write_message(&format!("Failed to reconfigure displays: {}", e));
+                write_error!(&format!("Failed to reconfigure displays: {}", e));
             }
             else {
-                write_message("Successfully reconfigured displays!");
+                write_success!("Successfully reconfigured displays!");
             }
         }
 
@@ -587,25 +683,25 @@ impl Daemon {
                         Ok(config) => {
                             self.config = config;
 
-                            write_message("Successfully reloaded configuration!");
+                            write_success!("Successfully reloaded configuration!");
                         }
                         Err(error) => {
-                            write_message(&format!("Failed to parse configuration file: {}", error));
+                            write_error!(&format!("Failed to parse configuration file: {}", error));
                         }
                     }
                 },
                 Err(e) => {
-                    write_message(&format!("Failed to open configuration file for reloading: {}", e));
+                    write_error!(&format!("Failed to open configuration file for reloading: {}", e));
                 }
             }
         }
 
         if save_configuration {
             if let Err(e) = self.save_configuration() {
-                write_message(&format!("Failed to save configuration: {}", e));
+                write_error!(&format!("Failed to save configuration: {}", e));
             }
             else {
-                write_message("Successfully saved configuration!");
+                write_success!("Successfully saved configuration!");
             }
         }
     }
@@ -623,15 +719,13 @@ impl Daemon {
         Ok(())
     }
 
-    fn create_xrandr_command(&self) -> Command {
+    fn create_xrandr_command_with_brightness(&self, brightness_string: String) -> Command {
         let mut xrandr_call = Command::new("xrandr");
 
         for display in &self.displays {
             xrandr_call.arg("--output");
             xrandr_call.arg(display);
         }
-
-        let brightness_string = format!("{:.2}", *(&self.brightness) as f32 / 100.0);
 
         xrandr_call.arg("--brightness")
             .arg(brightness_string);
@@ -645,6 +739,12 @@ impl Daemon {
         }
 
         xrandr_call
+
+    }
+
+    fn create_xrandr_command(&self) -> Command {
+        let brightness_string = format!("{:.2}", *(&self.brightness) as f32 / 100.0);
+        self.create_xrandr_command_with_brightness(brightness_string)
     }
 }
 
@@ -787,7 +887,7 @@ fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Re
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift, auto_reconfigure);
+    overwrite_values!(use_redshift, auto_reconfigure, fade_options);
 
     return Ok(config);
 }
@@ -811,6 +911,7 @@ fn register_sigterm_handler() -> Result<()> {
                         let mock_save_daemon_input = ProgramInput {
                             brightness: None,
                             get_property: None,
+                            override_fade: None,
                             toggle_nightlight: false,
                             configure_display: false,
                             reload_configuration: false,

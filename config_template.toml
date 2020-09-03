@@ -1,4 +1,4 @@
-# v1.4.2
+# v1.4.5
 # ^ KEEP THIS IN THE TEMPLATE
 # Every time the template is updated, the current version is put at the top
 # You can delete it in your own config, but this should stay in the template
@@ -23,3 +23,28 @@ use_redshift = false
 # When connecting a new display, use `brightness_control -c` to apply settings
 # to that display
 auto_reconfigure = true
+
+[fade_options]
+# the highest brightness shift that does not use fading automatically
+# to disable automatic fading altogether, set this to 100
+# the default is for any shift greater than "2%" to use fading
+#
+# you can modify this depending on your usage
+# for example, with the default config, you can use 2% increments/decrements
+# for manual adjustments while using 10% adjustments for coarse-grained
+# adjustments
+threshold = 2
+
+# the duration in milliseconds for a fade to complete
+total_duration = 400
+
+# the duration in milliseconds of each individual brightness level over the
+# course of the fade
+#
+# the default value of "20" was determined through testing
+# because the xrandr processes are launched asynchronously, 20 milliseconds
+# gives each process sufficient time to terminate
+#
+# if you divide "fade_duration" by "fade_step_duration", you get the total
+# number of individual steps over the course of each fade
+step_duration = 20

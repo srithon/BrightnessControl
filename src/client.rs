@@ -91,10 +91,22 @@ fn check_get_property(matches: &Matches) -> Option<GetProperty> {
 pub fn handle_input(matches: Matches) -> Result<()> {
     let brightness = check_brightness(&matches)?;
     let get_property = check_get_property(&matches);
+    let override_fade = {
+        if matches.opt_present("fade") {
+            Some(true)
+        }
+        else if matches.opt_present("no-fade") {
+            Some(false)
+        }
+        else {
+            None
+        }
+    };
 
     let program_input = ProgramInput::new(
         brightness,
         get_property,
+        override_fade,
         matches.opt_present("configure-display"),
         matches.opt_present("toggle-nightlight"),
         matches.opt_present("reload-configuration"),
