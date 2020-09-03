@@ -436,6 +436,31 @@ impl Daemon {
         Ok(())
     }
 
+    fn check_child_processes(&mut self) {
+        // keep deleting head until the head is not done yet
+        // or the list is empty
+        loop {
+            if let Some(mut handle) = self.child_processes.get_mut(0) {
+                match handle.try_wait() {
+                    Ok(option) => {
+                        if let Some(_) = option {
+                            self.child_processes.pop_front();
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to wait on child handle: {}", e);
+                        // TODO figure out if we should still pop this
+                        self.child_processes.pop_front();
+                        break;
+                    }
+                }
+            }
+            else {
+                break;
+            }
+        }
+    }
+
     // boolean signals whether to skip display reconfiguration in process_input
     fn refresh_brightness(&mut self) -> Result<bool> {
         let mut _call_handle = self.create_xrandr_command().spawn()?;
