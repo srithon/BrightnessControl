@@ -50,6 +50,7 @@ pub enum GetProperty {
 pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
     get_property: Option<GetProperty>,
+    override_fade: Option<bool>,
     configure_display: bool,
     toggle_nightlight: bool,
     reload_configuration: bool,
@@ -57,10 +58,11 @@ pub struct ProgramInput {
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
+    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, override_fade: Option<bool>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
         ProgramInput {
             brightness,
             get_property,
+            override_fade,
             configure_display,
             toggle_nightlight,
             reload_configuration,
@@ -880,6 +882,7 @@ fn register_sigterm_handler() -> Result<()> {
                         let mock_save_daemon_input = ProgramInput {
                             brightness: None,
                             get_property: None,
+                            override_fade: None,
                             toggle_nightlight: false,
                             configure_display: false,
                             reload_configuration: false,
