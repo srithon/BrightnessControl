@@ -25,8 +25,8 @@ use_redshift = false
 auto_reconfigure = true
 
 [fade_options]
-# the highest brightness shift that does not use fading
-# to disable fading altogether, set this to 100
+# the highest brightness shift that does not use fading automatically
+# to disable automatic fading altogether, set this to 100
 # the default is for any shift greater than "2%" to use fading
 #
 # you can modify this depending on your usage
