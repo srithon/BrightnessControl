@@ -344,7 +344,7 @@ impl Daemon {
                 brightness: file_utils.get_written_brightness()?,
                 mode: file_utils.get_written_mode()?,
                 displays: file_utils.get_written_displays()?,
-                child_processes: Vec::new(),
+                child_processes: VecDeque::new(),
                 config,
                 file_utils
             }
