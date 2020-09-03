@@ -420,6 +420,8 @@ impl Daemon {
                     }
 
                     let _ = stream.shutdown(std::net::Shutdown::Both);
+
+                    self.check_child_processes();
                 }
                 Err(_) => {
                     break;
@@ -463,11 +465,10 @@ impl Daemon {
 
     // boolean signals whether to skip display reconfiguration in process_input
     fn refresh_brightness(&mut self) -> Result<bool> {
-        let mut _call_handle = self.create_xrandr_command().spawn()?;
+        let mut call_handle = self.create_xrandr_command().spawn()?;
 
-        if self.config.auto_reconfigure
-        {
-            let exit_status = _call_handle.wait()?;
+        if self.config.auto_reconfigure {
+            let exit_status = call_handle.wait()?;
 
             // if the call fails, then the configuration is no longer valid
             // reconfigures the display and then tries again
@@ -477,6 +478,9 @@ impl Daemon {
                 self.create_xrandr_command().spawn()?;
                 return Ok(true);
             }
+        }
+        else {
+            self.child_processes.push_back(call_handle);
         }
 
         Ok(false)
@@ -651,9 +655,17 @@ impl Daemon {
                         let brightness_string = format!("{:.5}", current_brightness / 100.0);
 
                         let mut command = self.create_xrandr_command_with_brightness(brightness_string);
-                        if let Err(e) = command.spawn() {
-                            write_error!(&format!("Failed to set brightness during fade: {}", e));
+
+                        match command.spawn() {
+                            Ok(call_handle) => {
+                                self.child_processes.push_back(call_handle);
+                            },
+                            Err(e) => {
+                                write_error!(&format!("Failed to set brightness during fade: {}", e));
+                            }
                         };
+
+                        self.check_child_processes();
 
                         // spin_sleep is more accurate than regular std::thread::sleep
                         // we want our fades to be smooth, so the delay for each one must be as
