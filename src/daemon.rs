@@ -495,6 +495,7 @@ impl Daemon {
         // struct elements
         let brightness = program_input.brightness;
         let get_property = program_input.get_property;
+        let fade = program_input.override_fade;
         let toggle_nightlight = program_input.toggle_nightlight;
         let mut configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
@@ -547,7 +548,18 @@ impl Daemon {
 
                 let fade_options = &self.config.fade_options;
 
-                if (total_brightness_shift.abs()) as u8 <= fade_options.threshold {
+                let fade = {
+                    // if it contains a value, use it
+                    if let Some(fade) = fade {
+                        fade
+                    }
+                    else {
+                        // if there is no override, then do the auto check
+                        (total_brightness_shift.abs()) as u8 > fade_options.threshold 
+                    }
+                };
+
+                if !fade {
                     self.brightness = new_brightness;
 
                     // this returns true if refresh_brightness reconfigured the display automatically
