@@ -501,11 +501,28 @@ impl Daemon {
         let reload_configuration = program_input.reload_configuration;
         let save_configuration = program_input.save_configuration;
 
-        let mut write_message = move |message: &str| {
+        let mut write_message = move |message: &str, log_socket_error: bool| {
             if let Err(e) = socket.write_all(message.as_bytes()) {
-                eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                if log_socket_error {
+                    eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                }
             }
         };
+
+        // have to use macros for these two because if they were closures they would need to share
+        // a mutable reference to the write_message closure, which the borrow checker
+        // would not allow
+        macro_rules! write_success {
+            ($message:expr) => {
+                write_message($message, false);
+            }
+        }
+
+        macro_rules! write_error {
+            ($message:expr) => {
+                write_message($message, true);
+            }
+        }
 
         if toggle_nightlight {
             self.mode = !self.mode;
@@ -513,13 +530,13 @@ impl Daemon {
             (|| {
                 if self.config.use_redshift {
                     if let Err(e) = self.refresh_redshift() {
-                        write_message(&format!("Failed to refresh redshift: {}", e));
+                        write_error!(&format!("Failed to refresh redshift: {}", e));
                         return;
                     }
                 }
                 else {
                     if let Err(e) = self.refresh_brightness() {
-                        write_message(&format!("Failed to refresh xrandr: {}", e));
+                        write_error!(&format!("Failed to refresh xrandr: {}", e));
                         return;
                     }
                 }
@@ -527,10 +544,10 @@ impl Daemon {
                 // could have used format! to make this a one-liner, but this allows the strings to be
                 // stored in static memory instead of having to be generated at runtime
                 if self.mode {
-                    write_message("Enabled nightlight");
+                    write_error!("Enabled nightlight");
                 }
                 else {
-                    write_message("Disabled nightlight");
+                    write_error!("Disabled nightlight");
                 }
             })()
         }
@@ -566,15 +583,15 @@ impl Daemon {
                     // dont want to reconfigure AGAIN
                     match self.refresh_brightness() {
                         Ok(skip_configure_display) => {
-                            write_message(&format!("Set brightness to {}%", self.brightness));
+                            write_error!(&format!("Set brightness to {}%", self.brightness));
 
                             if skip_configure_display {
                                 configure_display = false;
-                                write_message("Automatically reconfigured displays!");
+                                write_error!("Automatically reconfigured displays!");
                             }
                         },
                         Err(e) => {
-                            write_message(&format!("Failed to refresh brightness: {}", e));
+                            write_error!(&format!("Failed to refresh brightness: {}", e));
                         }
                     };
                 }
@@ -605,7 +622,7 @@ impl Daemon {
 
                         let mut command = self.create_xrandr_command_with_brightness(brightness_string);
                         if let Err(e) = command.spawn() {
-                            write_message(&format!("Failed to set brightness during fade: {}", e));
+                            write_error!(&format!("Failed to set brightness during fade: {}", e));
                         };
 
                         // spin_sleep is more accurate than regular std::thread::sleep
@@ -618,10 +635,10 @@ impl Daemon {
 
                     match self.refresh_brightness() {
                         Ok(_) => {
-                            write_message(&format!("Completed fade to brightness: {}", new_brightness));
+                            write_success!(&format!("Completed fade to brightness: {}", new_brightness));
                         }
                         Err(e) => {
-                            write_message(&format!("Failed to complete fade: {}", e));
+                            write_error!(&format!("Failed to complete fade: {}", e));
                         }
                     }
                 }
@@ -645,15 +662,15 @@ impl Daemon {
                 }
             };
 
-            write_message(&property_value);
+            write_success!(&property_value);
         };
 
         if configure_display {
             if let Err(e) = self.reconfigure_displays() {
-                write_message(&format!("Failed to reconfigure displays: {}", e));
+                write_error!(&format!("Failed to reconfigure displays: {}", e));
             }
             else {
-                write_message("Successfully reconfigured displays!");
+                write_success!("Successfully reconfigured displays!");
             }
         }
 
@@ -666,25 +683,25 @@ impl Daemon {
                         Ok(config) => {
                             self.config = config;
 
-                            write_message("Successfully reloaded configuration!");
+                            write_success!("Successfully reloaded configuration!");
                         }
                         Err(error) => {
-                            write_message(&format!("Failed to parse configuration file: {}", error));
+                            write_error!(&format!("Failed to parse configuration file: {}", error));
                         }
                     }
                 },
                 Err(e) => {
-                    write_message(&format!("Failed to open configuration file for reloading: {}", e));
+                    write_error!(&format!("Failed to open configuration file for reloading: {}", e));
                 }
             }
         }
 
         if save_configuration {
             if let Err(e) = self.save_configuration() {
-                write_message(&format!("Failed to save configuration: {}", e));
+                write_error!(&format!("Failed to save configuration: {}", e));
             }
             else {
-                write_message("Successfully saved configuration!");
+                write_success!("Successfully saved configuration!");
             }
         }
     }
