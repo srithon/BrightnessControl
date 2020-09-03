@@ -11,7 +11,9 @@ use std::os::unix::net::{UnixStream, UnixListener};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, Write, Read, Result};
 use std::fmt::Display;
-use std::process::Command;
+use std::process::{Command, Child};
+
+use std::collections::VecDeque;
 
 use std::cmp;
 
@@ -290,6 +292,8 @@ struct Daemon {
     mode: bool,
     displays: Vec<String>,
     config: DaemonOptions,
+    // VecDeque for FIFO
+    child_processes: VecDeque<Child>,
     file_utils: FileUtils
 }
 
@@ -340,6 +344,7 @@ impl Daemon {
                 brightness: file_utils.get_written_brightness()?,
                 mode: file_utils.get_written_mode()?,
                 displays: file_utils.get_written_displays()?,
+                child_processes: VecDeque::new(),
                 config,
                 file_utils
             }
@@ -415,6 +420,8 @@ impl Daemon {
                     }
 
                     let _ = stream.shutdown(std::net::Shutdown::Both);
+
+                    self.check_child_processes();
                 }
                 Err(_) => {
                     break;
@@ -431,13 +438,37 @@ impl Daemon {
         Ok(())
     }
 
+    fn check_child_processes(&mut self) {
+        // keep deleting head until the head is not done yet
+        // or the list is empty
+        loop {
+            if let Some(handle) = self.child_processes.get_mut(0) {
+                match handle.try_wait() {
+                    Ok(option) => {
+                        if let Some(_) = option {
+                            self.child_processes.pop_front();
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to wait on child handle: {}", e);
+                        // TODO figure out if we should still pop this
+                        self.child_processes.pop_front();
+                        break;
+                    }
+                }
+            }
+            else {
+                break;
+            }
+        }
+    }
+
     // boolean signals whether to skip display reconfiguration in process_input
     fn refresh_brightness(&mut self) -> Result<bool> {
-        let mut _call_handle = self.create_xrandr_command().spawn()?;
+        let mut call_handle = self.create_xrandr_command().spawn()?;
 
-        if self.config.auto_reconfigure
-        {
-            let exit_status = _call_handle.wait()?;
+        if self.config.auto_reconfigure {
+            let exit_status = call_handle.wait()?;
 
             // if the call fails, then the configuration is no longer valid
             // reconfigures the display and then tries again
@@ -447,6 +478,9 @@ impl Daemon {
                 self.create_xrandr_command().spawn()?;
                 return Ok(true);
             }
+        }
+        else {
+            self.child_processes.push_back(call_handle);
         }
 
         Ok(false)
@@ -621,9 +655,17 @@ impl Daemon {
                         let brightness_string = format!("{:.5}", current_brightness / 100.0);
 
                         let mut command = self.create_xrandr_command_with_brightness(brightness_string);
-                        if let Err(e) = command.spawn() {
-                            write_error!(&format!("Failed to set brightness during fade: {}", e));
+
+                        match command.spawn() {
+                            Ok(call_handle) => {
+                                self.child_processes.push_back(call_handle);
+                            },
+                            Err(e) => {
+                                write_error!(&format!("Failed to set brightness during fade: {}", e));
+                            }
                         };
+
+                        self.check_child_processes();
 
                         // spin_sleep is more accurate than regular std::thread::sleep
                         // we want our fades to be smooth, so the delay for each one must be as
