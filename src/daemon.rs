@@ -442,7 +442,7 @@ impl Daemon {
         // keep deleting head until the head is not done yet
         // or the list is empty
         loop {
-            if let Some(mut handle) = self.child_processes.get_mut(0) {
+            if let Some(handle) = self.child_processes.get_mut(0) {
                 match handle.try_wait() {
                     Ok(option) => {
                         if let Some(_) = option {
