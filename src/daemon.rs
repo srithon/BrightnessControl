@@ -266,6 +266,12 @@ impl FileUtils {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct NightlightOptions {
+    xrandr_gamma: String,
+    redshift_temperature: u32
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct FadeOptions {
     threshold: u8,
     // milliseconds
@@ -278,7 +284,8 @@ struct FadeOptions {
 struct DaemonOptions {
     use_redshift: bool,
     auto_reconfigure: bool,
-    fade_options: FadeOptions
+    fade_options: FadeOptions,
+    nightlight_options: NightlightOptions
 }
 
 impl DaemonOptions {
@@ -498,7 +505,7 @@ impl Daemon {
         // turn on redshift
         let mut redshift_enable = Command::new("redshift");
         redshift_enable.arg("-O");
-        redshift_enable.arg("1400");
+        redshift_enable.arg(format!("{}", self.config.nightlight_options.redshift_temperature));
         redshift_enable.spawn()?;
         Ok(())
     }
@@ -776,7 +783,7 @@ impl Daemon {
         {
             if self.mode {
                 xrandr_call.arg("--gamma")
-                    .arg("1.0:0.7:0.45");
+                    .arg(&self.config.nightlight_options.xrandr_gamma);
             }
         }
 
@@ -929,7 +936,7 @@ fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Re
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift, auto_reconfigure, fade_options);
+    overwrite_values!(use_redshift, auto_reconfigure, fade_options, nightlight_options);
 
     return Ok(config);
 }

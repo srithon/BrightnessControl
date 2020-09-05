@@ -1,4 +1,4 @@
-# v1.4.5
+# v1.4.7
 # ^ KEEP THIS IN THE TEMPLATE
 # Every time the template is updated, the current version is put at the top
 # You can delete it in your own config, but this should stay in the template
@@ -23,6 +23,19 @@ use_redshift = false
 # When connecting a new display, use `brightness_control -c` to apply settings
 # to that display
 auto_reconfigure = true
+
+[nightlight_options]
+# When use_redshift is set to false, BrightnessControl uses xrandr --gamma to
+# emulate a nightlight
+# The format is R:G:B, where each number is a multiplier for its corresponding
+# color
+# This default value was obtained through testing
+xrandr_gamma = "1.0:0.7:0.45"
+
+# Redshift has a -o flag that takes in the desired color temperature in Kelvin
+# Lower values are "warmer" and higher values are "cooler"
+# https://en.wikipedia.org/wiki/Color_temperature
+redshift_temperature = 1400
 
 [fade_options]
 # the highest brightness shift that does not use fading automatically
