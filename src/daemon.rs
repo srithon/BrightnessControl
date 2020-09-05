@@ -264,6 +264,12 @@ impl FileUtils {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct NightlightOptions {
+    xrandr_gamma: String,
+    redshift_temperature: u32
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct FadeOptions {
     threshold: u8,
     // milliseconds
@@ -276,7 +282,8 @@ struct FadeOptions {
 struct DaemonOptions {
     use_redshift: bool,
     auto_reconfigure: bool,
-    fade_options: FadeOptions
+    fade_options: FadeOptions,
+    nightlight_options: NightlightOptions
 }
 
 impl DaemonOptions {
