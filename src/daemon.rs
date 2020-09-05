@@ -471,7 +471,7 @@ impl Daemon {
         // turn on redshift
         let mut redshift_enable = Command::new("redshift");
         redshift_enable.arg("-O");
-        redshift_enable.arg("1400");
+        redshift_enable.arg(format!("{}", self.config.nightlight_options.redshift_temperature));
         redshift_enable.spawn()?;
         Ok(())
     }
@@ -741,7 +741,7 @@ impl Daemon {
         {
             if self.mode {
                 xrandr_call.arg("--gamma")
-                    .arg("1.0:0.7:0.45");
+                    .arg(&self.config.nightlight_options.xrandr_gamma);
             }
         }
 
