@@ -11,15 +11,15 @@ jobs:
 env:
 # 3 dot-separated numbers followed by an optional "-<something>"
 - VERSION_REGEX='v[0-9]+\.[0-9]+\.[0-9]+(-.+)?$'
+- BINARY_PATH="target/release/brightness_control-$TRAVIS_TAG-linux-amd64"
 script:
 - cargo build --verbose
 before_deploy:
 - cargo build --release
-- BINARY_PATH='target/release/brightness_control-$TRAVIS_TAG-linux-amd64'
-- mv target/release/brightness_control '$BINARY_PATH'
+- mv target/release/brightness_control "$BINARY_PATH"
 deploy:
   provider: releases
-  file: '$BINARY_PATH'
+  file: "$BINARY_PATH"
   skip_cleanup: true
   draft: true
   on:
