@@ -8,16 +8,23 @@ jobs:
   allow_failures:
   - rust: nightly
   fast_finish: true
+env:
+# 3 dot-separated numbers followed by an optional "-<something>"
+- VERSION_REGEX='v[0-9]+\.[0-9]+\.[0-9]+(-.+)?$'
 script:
 - cargo build --verbose
 before_deploy:
 - cargo build --release
+# dont include the "v" in the tag name
+- export BINARY_PATH="target/release/brightness_control-${TRAVIS_TAG:1}-linux-amd64"
+- mv target/release/brightness_control "$BINARY_PATH"
 deploy:
   provider: releases
-  file: target/release/brightness_control
+  file: "$BINARY_PATH"
   skip_cleanup: true
-  draft: true
   on:
     tags: true
+    # this is bash syntax for regex matching
+    condition: $TRAVIS_TAG =~ $VERSION_REGEX
   api_key:
     secure: meDk13CERduAlNZauo8caSOa1QCTRVEDpBAOTp+GCoXsGrtvtsts9bpGvu06cFsBrpasO48VgBFkGl7EIgi76JY2vOVrt8UIZJE9SYMo6bXokbswbi48BcnM+Ty+GwWqBkUqJpHA4+IJhPablBVtuLkWG3IcLLrc+ZxuHIzglm9KJnu6VkTDlOw7+xMjsh2Vmj2BMRbpnuRyUgP+y8lCRQGtCSl5T+3FwbBMtf3Suc+clbQmzf6d9dkWrNPBvzvfM7bLStaA0gZnnfMFaJrYtgYIPbLRs3T5zC7LeQJzYl5STd/s8FESlt3+q6Ziup+XMDy4BDJpixCBJ4DKJmrCgquUNwtdKosbHVfBCTxBtuLwcB+uo9zYUsOoP4AV3W2fl+LtXX+IglGTKEawNlVCcuV1A4D9gseMpfVnvaU6C/5q8TgkXIbBlPmxppM8S6ZqD3sHqi82XYvj+kbG/6EmQKpPgirrBF/Iobtk7lDBqzOdJcqezUHwRq4MGN6zhE7Sers5MB9ytiDmVN6ttRjo0ZyJdX7tclE1ABGpF0T6373aZsC+PgdY09y98UyNjPdfqiEm0GHV6EyGcDwfJ8BhvKf7LmIW/a22gpr0N8UEO42OLKLAIyhRVKFSfnIkLhjC+eJW48n7ALIwPMIcm2qCUlIepV3DzAmycYzULpQhMko=
