@@ -15,9 +15,11 @@ script:
 - cargo build --verbose
 before_deploy:
 - cargo build --release
+- BINARY_PATH='target/release/brightness_control-$TRAVIS_TAG-linux-amd64'
+- mv target/release/brightness_control '$BINARY_PATH'
 deploy:
   provider: releases
-  file: target/release/brightness_control
+  file: '$BINARY_PATH'
   skip_cleanup: true
   draft: true
   on:
