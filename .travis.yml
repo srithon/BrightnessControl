@@ -22,7 +22,6 @@ deploy:
   provider: releases
   file: "$BINARY_PATH"
   skip_cleanup: true
-  draft: true
   on:
     tags: true
     # this is bash syntax for regex matching
