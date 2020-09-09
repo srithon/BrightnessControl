@@ -38,6 +38,14 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg set: -s --set +takes_value {percentage_validator} "Sets the current brightness to %")
             )
         )
+        (@subcommand config =>
+            (about: "Holds commands involving daemon configuration")
+            (@group action =>
+                (@attributes +required)
+                (@arg reload: -r --reload "Tells the daemon to read the current configuration from the configuration file")
+                (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
+            )
+        )
     )
 }
 
