@@ -46,6 +46,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
+        (@arg get: -g --get +takes_value value_name[property] possible_value[brightness configuration displays mode] "Holds commands that return feedback from the daemon")
     )
 }
 
