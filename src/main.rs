@@ -1,79 +1,51 @@
 extern crate brightness_control;
 
-use getopts::Options;
+use clap::clap_app;
+use clap::crate_version;
+use clap::AppSettings;
 
 use std::io::Result;
 
 use brightness_control::{daemon, client};
 
-fn get_cli_interface() -> Options {
-    let mut options = Options::new();
-    options
-        .parsing_style(getopts::ParsingStyle::FloatingFrees)
-        .optflag("h", "help", "Prints the help menu")
-        .optflag("v", "version", "Prints the current version of BrightnessControl")
-        // b for BrightnessControl
-        // already used 'd' for decrement and I didnt want to replace increment/decrement with 'adjustment'
-        .optflag("b", "daemon", "Starts the BrightnessControl daemon")
-        .optflag("c", "configure-display", "Uses the current display configuration for future calls to BrightnessControl")
-        .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
-        .optflag("r", "reload-configuration", "Tells the daemon to re-read the configuration file and apply new changes")
-        .optflag("", "print-default-config", "Prints out the default configuration template")
-        .optflag("", "fade", "Overrides the auto-fade functionality and fades regardless of the current configuration")
-        .optflag("", "no-fade", "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
-        .optflag("q", "quiet", "Do not wait for the Daemon's output before terminating")
-        .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
-        .optopt("i", "increment", "Increments the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
-        .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
-        .optopt("g", "get", "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'", "PROPERTY");
-    options
-}
+fn get_cli_interface() -> clap::App<'static, 'static> {
+    let percentage_validator = |arg: String| {
+        if let Ok(num) = arg.parse::<i16>() {
+            if num <= 100 && num >= -100 {
+                Ok(())
+            }
+            else {
+                Err("Percentage out of bounds!".to_owned())
+            }
+        }
+        else {
+            Err("Invalid percentage!".to_owned())
+        }
+    };
 
-fn print_help(program_invocation_name: &str, cli: &Options) {
-    let brief = format!("Usage: {} [options]\nBrightnessControl {}", program_invocation_name, env!("CARGO_PKG_VERSION"));
-    print!("{}", cli.usage(&brief));
+    clap_app!(BrightnessControl =>
+        (@setting AllowNegativeNumbers)
+        (@setting VersionlessSubcommands)
+        (version: crate_version!())
+        (author: "Sridaran Thoniyil")
+        (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
+        (@subcommand brightness =>
+            (about: "Holds commands involving brightness modification")
+            (@group action =>
+                (@attributes +required)
+                (@arg increment: -i --increment +takes_value {percentage_validator} "Increases the current brightness by %")
+                (@arg decrement: -d --decrement +takes_value {percentage_validator} "Decrements the current brightness by %")
+                (@arg set: -s --set +takes_value {percentage_validator} "Sets the current brightness to %")
+            )
+        )
+    )
 }
 
 fn main() -> Result<()> {
     let cli = get_cli_interface();
-    let args = std::env::args().collect::<Vec<String>>();
 
-    // this lets you see exactly how the user invoked the program
-    // this is then used in the help screen
-    let program_invocation_name = args[0].clone();
+    let matches = cli.get_matches();
 
-    let matches = match cli.parse(&args[1..]) {
-        Ok(matches) => matches,
-        Err(error) => {
-            let error_string = error.to_string();
-            eprintln!("Syntax error: {}\n", error_string);
-            print_help(&program_invocation_name, &cli);
-
-            // if an Err is returned instead, the Termination trait automatically serializes the
-            // Err and prints it out
-            // we do not want anything to be printed out, so instead of returning an Err, we
-            // manually terminate the program with exit code 1
-            std::process::exit(1);
-        }
-    };
-
-    if matches.opt_present("help") {
-        print_help(&program_invocation_name, &cli);
-    }
-    else if matches.opt_present("version") {
-        println!("BrightnessControl {}", env!("CARGO_PKG_VERSION"));
-    }
-    else if matches.opt_present("print-default-config") {
-        println!("{}", daemon::CONFIG_TEMPLATE);
-    }
-    else if matches.opt_present("daemon") {
-        // START DAEMON
-        daemon::daemon()?;
-    }
-    else {
-        // RUN CLIENT CODE
-        client::handle_input(matches)?;
-    }
 
     Ok(())
 }
