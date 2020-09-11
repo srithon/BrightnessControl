@@ -37,6 +37,8 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg decrement: -d --decrement <PERCENTAGE> {percentage_validator} "Decrements the current brightness by %")
                 (@arg set: -s --set <PERCENTAGE> {percentage_validator} "Sets the current brightness to %")
             )
+            (@arg force_fade: -f --fade "Overrides the auto-fade functionality and fades regardless of the current configuration")
+            (@arg force_no_fade: -n --("no-fade") "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
         )
         (@subcommand config =>
             (about: "Holds commands involving daemon configuration")
