@@ -56,7 +56,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg start: -s --start "Attempts to start the daemon. The process will not be tied to the process that runs it")
             )
         )
-    )
+    ).global_setting(AppSettings::ArgRequiredElseHelp)
 }
 
 fn main() -> Result<()> {
