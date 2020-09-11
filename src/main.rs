@@ -49,6 +49,13 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             )
         )
         (@arg get: -g --get +takes_value value_name[property] possible_value[brightness configuration displays mode] "Holds commands that return feedback from the daemon")
+        (@subcommand daemon =>
+            (about: "Holds commands relating to the daemon lifecycle")
+            (@group action =>
+                (@attributes +required)
+                (@arg start: -s --start "Attempts to start the daemon. The process will not be tied to the process that runs it")
+            )
+        )
     )
 }
 
