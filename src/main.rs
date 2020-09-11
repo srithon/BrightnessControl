@@ -24,13 +24,13 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
     };
 
     clap_app!(BrightnessControl =>
-        (@setting AllowNegativeNumbers)
         (@setting VersionlessSubcommands)
         (version: crate_version!())
         (author: "Sridaran Thoniyil")
         (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
         (@subcommand brightness =>
             (about: "Holds commands involving brightness modification")
+            (@setting AllowNegativeNumbers)
             (@group action =>
                 (@attributes +required)
                 (@arg increment: -i --increment +takes_value value_name[PERCENTAGE] {percentage_validator} "Increases the current brightness by %")
