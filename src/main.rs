@@ -65,12 +65,14 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg decrement: -d --decrement +takes_value value_name[PERCENTAGE] {percentage_validator} "Decrements the current brightness by %")
                 (@arg set: -s --set +takes_value value_name[PERCENTAGE] {percentage_validator} "Sets the current brightness to %")
             )
+            (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@arg force_fade: -f --fade "Overrides the auto-fade functionality and fades regardless of the current configuration")
             (@arg force_no_fade: -n --("no-fade") "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
         )
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
             (visible_alias: "n")
+            (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@group action =>
                 (@arg toggle_nightlight: -t --toggle "Toggles the nightlight")
             )
@@ -85,7 +87,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         )
         (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'")
         (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
-        (@arg quiet: -q --quiet +global "Do not wait for the Daemon's output before terminating")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
             (visible_alias: "d")
