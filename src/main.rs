@@ -58,6 +58,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
         (@subcommand brightness =>
             (about: "Holds commands involving brightness modification")
+            (visible_alias: "b")
             (@setting AllowNegativeNumbers)
             (@group action =>
                 (@arg increment: -i --increment +takes_value value_name[PERCENTAGE] {percentage_validator} "Increases the current brightness by %")
@@ -69,12 +70,14 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         )
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
+            (visible_alias: "n")
             (@group action =>
                 (@arg toggle_nightlight: -t --toggle "Toggles the nightlight")
             )
         )
         (@subcommand config =>
             (about: "Holds commands involving daemon configuration")
+            (visible_alias: "c")
             (@group action =>
                 (@arg reload_configuration: -r --reload "Tells the daemon to read the current configuration from the configuration file")
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
@@ -85,6 +88,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (@arg quiet: -q --quiet +global "Do not wait for the Daemon's output before terminating")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
+            (visible_alias: "d")
             (@group action =>
                 (@arg start: -s --start "Attempts to start the daemon. The process will not be tied to the process that runs it")
             )
