@@ -42,13 +42,13 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
             (@group action =>
-                (@arg toggle: -t --toggle "Toggles the nightlight")
+                (@arg toggle_nightlight: -t --toggle "Toggles the nightlight")
             )
         )
         (@subcommand config =>
             (about: "Holds commands involving daemon configuration")
             (@group action =>
-                (@arg reload: -r --reload "Tells the daemon to read the current configuration from the configuration file")
+                (@arg reload_configuration: -r --reload "Tells the daemon to read the current configuration from the configuration file")
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
