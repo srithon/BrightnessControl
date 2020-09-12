@@ -101,5 +101,7 @@ fn main() -> Result<()> {
         std::process::exit(0);
     })()?;
 
+    client::handle_input(parsed_matches)?;
+
     Ok(())
 }
