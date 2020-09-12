@@ -23,6 +23,34 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         }
     };
 
+    let property_validator = |arg: String| {
+        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, and [m]ode";
+
+        if arg.len() == 1 {
+            const CHARS: &[char] = &['b', 'c', 'd', 'm'];
+            let arg_char = arg.chars().nth(0).unwrap();
+            let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
+
+            return if !valid {
+                Err(ERROR_MESSAGE.to_owned())
+            }
+            else {
+                Ok(())
+            }
+        }
+        else {
+            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode"];
+            let valid = OPTIONS.iter().any(|prop| arg.eq_ignore_ascii_case(prop));
+
+            return if !valid {
+                Err(ERROR_MESSAGE.to_owned())
+            }
+            else {
+                Ok(())
+            }
+        }
+    };
+
     clap_app!(BrightnessControl =>
         (@setting VersionlessSubcommands)
         (version: crate_version!())
@@ -52,7 +80,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
-        (@arg get: -g --get +takes_value value_name[property] possible_value[brightness configuration displays mode] "Holds commands that return feedback from the daemon")
+        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'")
         (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
         (@arg quiet: -q --quiet +global "Do not wait for the Daemon's output before terminating")
         (@subcommand daemon =>
