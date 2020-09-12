@@ -69,32 +69,31 @@ fn main() -> Result<()> {
 
     let matches = cli.get_matches();
 
-    let parsed_matches = (|| -> Result<Option<&clap::ArgMatches>> {
+    let parsed_matches = (|| -> Result<&clap::ArgMatches> {
         match matches.subcommand() {
             ("daemon", Some(sub_app)) => {
                 if sub_app.is_present("start") {
                     daemon::daemon()?;
                 }
             },
-            // bind "config" to subcommand_name variable
-            (subcommand_name @ "config", Some(sub_app)) => {
+            ("config", Some(sub_app)) => {
                 if sub_app.is_present("print-default") {
                     println!("{}", daemon::CONFIG_TEMPLATE);
                 }
                 else {
-                    return Ok( Some(sub_app) );
+                    return Ok( sub_app );
                 }
             },
             // match all
-            (subcommand_name, subcommand) => {
+            (_, subcommand) => {
                 // if there is a subcommand, return that
                 // otherwise, just return the base matches object
                 // -- this allows parsing of base-level arguments
-                return if subcommand.is_some() {
+                return if let Some(subcommand) = subcommand {
                     Ok( subcommand )
                 }
                 else {
-                    Ok( Some(&matches) )
+                    Ok( &matches )
                 }
             }
         };
