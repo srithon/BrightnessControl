@@ -68,6 +68,38 @@ fn main() -> Result<()> {
 
     let matches = cli.get_matches();
 
+    let parsed_matches = (|| -> Result<Option<&clap::ArgMatches>> {
+        match matches.subcommand() {
+            ("daemon", Some(sub_app)) => {
+                if sub_app.is_present("start") {
+                    daemon::daemon()?;
+                }
+            },
+            // bind "config" to subcommand_name variable
+            (subcommand_name @ "config", Some(sub_app)) => {
+                if sub_app.is_present("print-default") {
+                    println!("{}", daemon::CONFIG_TEMPLATE);
+                }
+                else {
+                    return Ok( Some(sub_app) );
+                }
+            },
+            // match all
+            (subcommand_name, subcommand) => {
+                // if there is a subcommand, return that
+                // otherwise, just return the base matches object
+                // -- this allows parsing of base-level arguments
+                return if subcommand.is_some() {
+                    Ok( subcommand )
+                }
+                else {
+                    Ok( Some(&matches) )
+                }
+            }
+        };
+
+        std::process::exit(0);
+    })()?;
 
     Ok(())
 }
