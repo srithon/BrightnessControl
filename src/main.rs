@@ -32,7 +32,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             (about: "Holds commands involving brightness modification")
             (@setting AllowNegativeNumbers)
             (@group action =>
-                (@attributes +required)
                 (@arg increment: -i --increment +takes_value value_name[PERCENTAGE] {percentage_validator} "Increases the current brightness by %")
                 (@arg decrement: -d --decrement +takes_value value_name[PERCENTAGE] {percentage_validator} "Decrements the current brightness by %")
                 (@arg set: -s --set +takes_value value_name[PERCENTAGE] {percentage_validator} "Sets the current brightness to %")
@@ -43,7 +42,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (@subcommand config =>
             (about: "Holds commands involving daemon configuration")
             (@group action =>
-                (@attributes +required)
                 (@arg reload: -r --reload "Tells the daemon to read the current configuration from the configuration file")
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
@@ -52,7 +50,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
             (@group action =>
-                (@attributes +required)
                 (@arg start: -s --start "Attempts to start the daemon. The process will not be tied to the process that runs it")
             )
         )
