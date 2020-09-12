@@ -120,44 +120,37 @@ sed -i 's/adjustment-method=randr/adjustment-method=vidmode' ~/.config/redshift.
 ## Usage
 *All examples assume that the name of the executable is `brightness_control` and that the executable can be found in one of the directories in the `PATH` environmental variable*
 
-All brightness_control options have shorthands. For most of them, the first letter of the option's name acts as the shorthand. However, "daemon" and "decrement" both start with 'd'; "decrement" came first, so "daemon"'s shorthand is "-b"
+All brightness_control options have shorthands. For most of them, the first letter of the option's name acts as the shorthand.
 
 When using shorthands, the separating space between an option and its value may be omitted. This is shown in the first example, and can be applied to any option that takes a value
 
-Since version `1.4.1`, client commands that interact with the daemon will return feedback. To suppress this output (when using keybindings, for example), pass the `--quiet` or `-q` flag with the command. This flag allows the client to terminate and shutdown the socket without having to wait for the daemon to respond.
-
 *To Reduce the Brightness by 10%*
 ```
-$ brightness_control --decrement 10
+$ brightness_control brightness --decrement 10
 ```
 or
 ```
-$ brightness_control -d10
+$ brightness_control b -d10
 ```
 
 *To Increase the Brightness by 10%*
 ```
-$ brightness_control --increment 10
+$ brightness_control b --increment 10
 ```
 
 *To Set the Brightness to 80%*
 ```
-$ brightness_control --set 80
+$ brightness_control b --set 80
 ```
 
 _To Set the Brightness to 50% Without Fading_
 ```
-$ brightness_control --set 80 --no-fade
-```
-
-*To Refresh the Current Brightness*
-```
-$ brightness_control
+$ brightness_control b -ns80
 ```
 
 *To Toggle Night Light*
 ```
-$ brightness_control --toggle-nightlight
+$ brightness_control nightlight --toggle
 ```
 
 *To Reconfigure the Cached Display Settings*
@@ -169,7 +162,7 @@ $ brightness_control --configure-display
 
 *To Start the Daemon*
 ```
-$ brightness_control --daemon
+$ brightness_control daemon --start
 ```
 
 *To View the Help Menu*
@@ -179,22 +172,22 @@ $ brightness_control --help
 
 _To Print Out the Current Configuration Template_
 ```
-$ brightness_control --print-config-template
+$ brightness_control config --print-config-template
 ```
 
 _To Print Out the Current Brightness_
 ```
-$ brightness_control --get brightness
+$ brightness_control --get b
 ```
 
 _To Print Out the Currently Loaded Configuration_
 ```
-$ brightness_control --get config
+$ brightness_control --gconfiguration
 ```
 
 *To Reload the Daemon Configuration*
 ```
-$ brightness_control --reload-configuration
+$ brightness_control c --reload
 ```
 
 ## Configuration
@@ -203,13 +196,13 @@ If the file does not exist when the daemon is started, it automatically creates 
 
 The default configuration template is stored in `~/.local/share/brightnesscontrol/config_template.toml`
 
-The daemon writes the template to disk when it is first started. To do this manually, copy the output of `brightness_control --print-config-template` to the file.
+The daemon writes the template to disk when it is first started. To do this manually, copy the output of `brightness_control c --print-default` to the file.
 
 Whenever the daemon is started, it checks to see if the configuration template is out of date. If it is, then it overwrites it with the current template.
 
 When the daemon overwrites the template, it will indicate this through stdout. `BrightnessControl` will never overwrite your personal configuration, so whenever new options are added to the template, they have to be copied over manually.
 
-You can reload the configuration without restarting the daemon by running `brightness_control --reload-configuration` as shown above.
+You can reload the configuration without restarting the daemon by running `brightness_control --reload` as shown above.
 
 If the file cannot be parsed, the client will print out the error.
 
@@ -222,15 +215,15 @@ In the future, this functionality may be integrated directly into the applicatio
 
 An example schema is below
 
-Alt+PgUp        -> `brightness_control -i10`
+Alt+PgUp        -> `brightness_control b -i10`
 
-Alt+PgDown      -> `brightness_control -d10`
+Alt+PgDown      -> `brightness_control b -d10`
 
-Alt+Ctrl+PgUp   -> `brightness_control -i2`
+Alt+Ctrl+PgUp   -> `brightness_control b -i2`
 
-Alt+Ctrl+PgDown -> `brightness_control -d2`
+Alt+Ctrl+PgDown -> `brightness_control b -d2`
 
-Alt+End         -> `brightness_control -t`
+Alt+End         -> `brightness_control n -t`
 
 Alt+Home        -> `brightness_control -c`
 

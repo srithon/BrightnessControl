@@ -1,79 +1,140 @@
 extern crate brightness_control;
 
-use getopts::Options;
+use clap::clap_app;
+use clap::crate_version;
+use clap::AppSettings;
 
 use std::io::Result;
 
 use brightness_control::{daemon, client};
 
-fn get_cli_interface() -> Options {
-    let mut options = Options::new();
-    options
-        .parsing_style(getopts::ParsingStyle::FloatingFrees)
-        .optflag("h", "help", "Prints the help menu")
-        .optflag("v", "version", "Prints the current version of BrightnessControl")
-        // b for BrightnessControl
-        // already used 'd' for decrement and I didnt want to replace increment/decrement with 'adjustment'
-        .optflag("b", "daemon", "Starts the BrightnessControl daemon")
-        .optflag("c", "configure-display", "Uses the current display configuration for future calls to BrightnessControl")
-        .optflag("t", "toggle-nightlight", "Toggles the nightlight mode on/off")
-        .optflag("r", "reload-configuration", "Tells the daemon to re-read the configuration file and apply new changes")
-        .optflag("", "print-default-config", "Prints out the default configuration template")
-        .optflag("", "fade", "Overrides the auto-fade functionality and fades regardless of the current configuration")
-        .optflag("", "no-fade", "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
-        .optflag("q", "quiet", "Do not wait for the Daemon's output before terminating")
-        .optopt("s", "set", "Sets the current brightness to some percentage [0..100]", "PERCENTAGE")
-        .optopt("i", "increment", "Increments the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
-        .optopt("d", "decrement", "Decrements the current brightness by some (integer) percentage between -100 and +100", "PERCENTAGE")
-        .optopt("g", "get", "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'", "PROPERTY");
-    options
-}
+fn get_cli_interface() -> clap::App<'static, 'static> {
+    let percentage_validator = |arg: String| {
+        if let Ok(num) = arg.parse::<i16>() {
+            if num <= 100 && num >= -100 {
+                Ok(())
+            }
+            else {
+                Err("Percentage out of bounds!".to_owned())
+            }
+        }
+        else {
+            Err("Invalid percentage!".to_owned())
+        }
+    };
 
-fn print_help(program_invocation_name: &str, cli: &Options) {
-    let brief = format!("Usage: {} [options]\nBrightnessControl {}", program_invocation_name, env!("CARGO_PKG_VERSION"));
-    print!("{}", cli.usage(&brief));
+    let property_validator = |arg: String| {
+        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, and [m]ode";
+
+        if arg.len() == 1 {
+            const CHARS: &[char] = &['b', 'c', 'd', 'm'];
+            let arg_char = arg.chars().nth(0).unwrap();
+            let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
+
+            return if !valid {
+                Err(ERROR_MESSAGE.to_owned())
+            }
+            else {
+                Ok(())
+            }
+        }
+        else {
+            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode"];
+            let valid = OPTIONS.iter().any(|prop| arg.eq_ignore_ascii_case(prop));
+
+            return if !valid {
+                Err(ERROR_MESSAGE.to_owned())
+            }
+            else {
+                Ok(())
+            }
+        }
+    };
+
+    clap_app!(BrightnessControl =>
+        (@setting VersionlessSubcommands)
+        (version: crate_version!())
+        (author: "Sridaran Thoniyil")
+        (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
+        (@subcommand brightness =>
+            (about: "Holds commands involving brightness modification")
+            (visible_alias: "b")
+            (@setting AllowNegativeNumbers)
+            (@group action =>
+                (@arg increment: -i --increment +takes_value value_name[PERCENTAGE] {percentage_validator} "Increases the current brightness by %")
+                (@arg decrement: -d --decrement +takes_value value_name[PERCENTAGE] {percentage_validator} "Decrements the current brightness by %")
+                (@arg set: -s --set +takes_value value_name[PERCENTAGE] {percentage_validator} "Sets the current brightness to %")
+            )
+            (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
+            (@arg force_fade: -f --fade "Overrides the auto-fade functionality and fades regardless of the current configuration")
+            (@arg force_no_fade: -n --("no-fade") "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
+        )
+        (@subcommand nightlight =>
+            (about: "Holds commands relating to the nightlight")
+            (visible_alias: "n")
+            (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
+            (@group action =>
+                (@arg toggle_nightlight: -t --toggle "Toggles the nightlight")
+            )
+        )
+        (@subcommand config =>
+            (about: "Holds commands involving daemon configuration")
+            (visible_alias: "c")
+            (@group action =>
+                (@arg reload_configuration: -r --reload "Tells the daemon to read the current configuration from the configuration file")
+                (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
+            )
+        )
+        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'")
+        (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
+        (@subcommand daemon =>
+            (about: "Holds commands relating to the daemon lifecycle")
+            (visible_alias: "d")
+            (@group action =>
+                (@arg start: -s --start "Attempts to start the daemon. The process will not be tied to the process that runs it")
+            )
+        )
+    ).global_setting(AppSettings::ArgRequiredElseHelp)
 }
 
 fn main() -> Result<()> {
     let cli = get_cli_interface();
-    let args = std::env::args().collect::<Vec<String>>();
 
-    // this lets you see exactly how the user invoked the program
-    // this is then used in the help screen
-    let program_invocation_name = args[0].clone();
+    let matches = cli.get_matches();
 
-    let matches = match cli.parse(&args[1..]) {
-        Ok(matches) => matches,
-        Err(error) => {
-            let error_string = error.to_string();
-            eprintln!("Syntax error: {}\n", error_string);
-            print_help(&program_invocation_name, &cli);
+    let parsed_matches = (|| -> Result<&clap::ArgMatches> {
+        match matches.subcommand() {
+            ("daemon", Some(sub_app)) => {
+                if sub_app.is_present("start") {
+                    daemon::daemon()?;
+                }
+            },
+            ("config", Some(sub_app)) => {
+                if sub_app.is_present("print-default") {
+                    println!("{}", daemon::CONFIG_TEMPLATE);
+                }
+                else {
+                    return Ok( sub_app );
+                }
+            },
+            // match all
+            (_, subcommand) => {
+                // if there is a subcommand, return that
+                // otherwise, just return the base matches object
+                // -- this allows parsing of base-level arguments
+                return if let Some(subcommand) = subcommand {
+                    Ok( subcommand )
+                }
+                else {
+                    Ok( &matches )
+                }
+            }
+        };
 
-            // if an Err is returned instead, the Termination trait automatically serializes the
-            // Err and prints it out
-            // we do not want anything to be printed out, so instead of returning an Err, we
-            // manually terminate the program with exit code 1
-            std::process::exit(1);
-        }
-    };
+        std::process::exit(0);
+    })()?;
 
-    if matches.opt_present("help") {
-        print_help(&program_invocation_name, &cli);
-    }
-    else if matches.opt_present("version") {
-        println!("BrightnessControl {}", env!("CARGO_PKG_VERSION"));
-    }
-    else if matches.opt_present("print-default-config") {
-        println!("{}", daemon::CONFIG_TEMPLATE);
-    }
-    else if matches.opt_present("daemon") {
-        // START DAEMON
-        daemon::daemon()?;
-    }
-    else {
-        // RUN CLIENT CODE
-        client::handle_input(matches)?;
-    }
+    client::handle_input(parsed_matches)?;
 
     Ok(())
 }
