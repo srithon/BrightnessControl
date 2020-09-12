@@ -1,7 +1,7 @@
 use bincode::Options as BincodeOptions;
 use clap::ArgMatches;
 
-use std::io::{Error, ErrorKind, Write, Result};
+use std::io::{Write, Result};
 
 use std::os::unix::net::UnixStream;
 
