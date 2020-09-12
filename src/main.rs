@@ -39,6 +39,12 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             (@arg force_fade: -f --fade "Overrides the auto-fade functionality and fades regardless of the current configuration")
             (@arg force_no_fade: -n --("no-fade") "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
         )
+        (@subcommand nightlight =>
+            (about: "Holds commands relating to the nightlight")
+            (@group action =>
+                (@arg toggle: -t --toggle "Toggles the nightlight")
+            )
+        )
         (@subcommand config =>
             (about: "Holds commands involving daemon configuration")
             (@group action =>
