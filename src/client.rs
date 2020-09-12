@@ -1,5 +1,5 @@
 use bincode::Options as BincodeOptions;
-use getopts::Matches;
+use clap::ArgMatches;
 
 use std::io::{Error, ErrorKind, Write, Result};
 
@@ -9,70 +9,60 @@ use std::io::{BufRead, BufReader};
 
 use crate::daemon::*;
 
-fn check_brightness(matches: &Matches) -> Result<Option<BrightnessChange>> {
-    let increment = matches.opt_str("increment");
-    let decrement = matches.opt_str("decrement");
-    let set = matches.opt_str("set");
-
-    let result: Result<Option<BrightnessChange>> = (|| {
-        let invalid_input = | message | {
-            Err(Error::new(ErrorKind::InvalidInput, message))
-        };
-
-        let duplicate_arguments = || {
-            invalid_input("Only one of {increment, decrement, set} can be used at the same time!")
-        };
-
-        if increment.is_some() || decrement.is_some() {
-            if set.is_some() || increment.is_some() && decrement.is_some() {
-                return duplicate_arguments();
-            }
-
-            let (num, multiplier) = {
-                if increment.is_some() {
-                    (increment.unwrap(), 1)
-                }
-                else {
-                    (decrement.unwrap(), -1)
-                }
-            };
-
-            // "num" is a valid number
-            if let Ok(num) = num.parse::<i8>() {
-                if num <= 100 && num >= -100 {
-                    Ok(Some(BrightnessChange::Adjustment(num * multiplier)))
-                }
-                else {
-                    invalid_input("Brightness adjustment must be between -100 and 100!")
-                }
-            }
-            else {
-                invalid_input("Invalid number passed as decrement/increment")
-            }
-        }
-        else if let Some(set) = set {
-            // ^ use if let here because there is only 1 variable to worry about
-            if decrement.is_some() {
-                return duplicate_arguments();
-            }
-
-            if let Ok(new_brightness) = set.parse::<u8>() {
-                Ok(Some(BrightnessChange::Set(new_brightness)))
-            }
-            else {
-                invalid_input("Invalid brightness passed to set")
-            }
-        }
-        else {
-            Ok(None)
-        }
-    })();
-
-    result
+struct BrightnessSubcommand {
+    brightness_change: Option<BrightnessChange>,
+    override_fade: Option<bool>
 }
 
-fn check_get_property(matches: &Matches) -> Option<GetProperty> {
-    if let Some(get_argument) = matches.opt_str("get") {
+fn check_brightness(matches: &ArgMatches) -> Result<BrightnessSubcommand> {
+    let brightness_change = {
+        if let Some(new_brightness) = matches.value_of("set") {
+            // unwrap because caller should be doing input validation
+            Some(BrightnessChange::Set(new_brightness.parse::<u8>().unwrap()))
+        }
+        else {
+            (|| {
+                let (num_string, multiplier) = {
+                    if let Some(brightness_shift) = matches.value_of("increment") {
+                        (brightness_shift, 1)
+                    }
+                    else if let Some(brightness_shift) = matches.value_of("decrement") {
+                        (brightness_shift, -1)
+                    }
+                    else {
+                        return None;
+                    }
+                };
+
+                let num = num_string.parse::<i8>().unwrap();
+
+                Some(BrightnessChange::Adjustment(num * multiplier))
+            })()
+        }
+    };
+
+    let override_fade = {
+        if matches.is_present("force_fade") {
+            Some(true)
+        }
+        else if matches.is_present("force_no_fade") {
+            Some(false)
+        }
+        else {
+            None
+        }
+    };
+
+    return Ok(
+        BrightnessSubcommand {
+            brightness_change,
+            override_fade
+        }
+    );
+}
+
+fn check_get_property(matches: &ArgMatches) -> Option<GetProperty> {
+    if let Some(get_argument) = matches.value_of("get") {
         if let Some(mut first_char) = get_argument.chars().nth(0) {
             first_char.make_ascii_lowercase();
             return match first_char {
@@ -88,28 +78,17 @@ fn check_get_property(matches: &Matches) -> Option<GetProperty> {
     None
 }
 
-pub fn handle_input(matches: Matches) -> Result<()> {
-    let brightness = check_brightness(&matches)?;
+pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
+    let brightness_subcommand = check_brightness(&matches)?;
     let get_property = check_get_property(&matches);
-    let override_fade = {
-        if matches.opt_present("fade") {
-            Some(true)
-        }
-        else if matches.opt_present("no-fade") {
-            Some(false)
-        }
-        else {
-            None
-        }
-    };
 
     let program_input = ProgramInput::new(
-        brightness,
+        brightness_subcommand.brightness_change,
         get_property,
-        override_fade,
-        matches.opt_present("configure-display"),
-        matches.opt_present("toggle-nightlight"),
-        matches.opt_present("reload-configuration"),
+        brightness_subcommand.override_fade,
+        matches.is_present("configure_display"),
+        matches.is_present("toggle_nightlight"),
+        matches.is_present("reload_configuration"),
         false
     );
 
@@ -129,7 +108,7 @@ pub fn handle_input(matches: Matches) -> Result<()> {
 
     socket.write_all(&binary_encoded_input)?;
 
-    if !matches.opt_present("quiet") {
+    if !matches.is_present("quiet") {
         // TODO figure out if a read timeout is necessary
         let buffered_reader = BufReader::with_capacity(512, &mut socket);
         for line in buffered_reader.lines() {
