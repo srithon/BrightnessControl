@@ -54,6 +54,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         )
         (@arg get: -g --get +takes_value value_name[property] possible_value[brightness configuration displays mode] "Holds commands that return feedback from the daemon")
         (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
+        (@arg quiet: -q --quiet +global "Do not wait for the Daemon's output before terminating")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
             (@group action =>
