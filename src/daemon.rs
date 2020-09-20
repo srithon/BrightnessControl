@@ -295,7 +295,7 @@ impl DaemonOptions {
 }
 
 struct Daemon {
-    brightness: u8,
+    brightness: f64,
     mode: bool,
     displays: Vec<String>,
     config: DaemonOptions,
