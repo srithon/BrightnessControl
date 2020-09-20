@@ -159,23 +159,23 @@ impl FileUtils {
         }
     }
 
-    fn get_written_brightness(&self) -> Result<u8> {
+    fn get_written_brightness(&self) -> Result<f64> {
         let mut brightness_file = self.get_brightness_file()?;
 
         get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
             // need to trim this because the newline character breaks the parse
-            if let Ok(num) = data_in_file.trim_end().parse::<u8>() {
-                // check bounds
-                if num <= 100 {
+            if let Ok(num) = data_in_file.trim_end().parse::<f64>() {
+                // check bounds; don't allow 0.0 brightness
+                if num <= 100.0 && num > 0.0 {
                     return Ok(num);
                 }
             }
 
             return Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"));
-        }, 100)
+        }, 100.0)
     }
 
-    fn write_brightness(&self, brightness: u8) -> Result<()> {
+    fn write_brightness(&self, brightness: f64) -> Result<()> {
         let mut brightness_file = self.get_brightness_file()?;
         overwrite_file_with_content(&mut brightness_file, brightness)?;
         Ok(())
@@ -595,14 +595,18 @@ impl Daemon {
 
         match brightness {
             Some(brightness_change) => {
-                let new_brightness = match brightness_change {
-                    BrightnessChange::Set(new_brightness) => new_brightness,
-                    BrightnessChange::Adjustment(brightness_shift) => {
-                        cmp::max(cmp::min(brightness_shift + (self.brightness as i8), 100), 0) as u8
-                    }
+                let new_brightness = {
+                    let integer_representation = match brightness_change {
+                        BrightnessChange::Set(new_brightness) => new_brightness,
+                        BrightnessChange::Adjustment(brightness_shift) => {
+                            cmp::max(cmp::min(brightness_shift + (self.brightness as i8), 100), 0) as u8
+                        }
+                    };
+
+                    integer_representation as f64
                 };
 
-                let total_brightness_shift = (new_brightness as i8) - (self.brightness as i8);
+                let total_brightness_shift = new_brightness - self.brightness;
 
                 let fade_options = &self.config.fade_options;
 
@@ -638,11 +642,9 @@ impl Daemon {
                 }
                 else {
                     // fade
-                    let mut current_brightness = self.brightness as f32;
-
                     let total_num_steps = fade_options.total_duration / fade_options.step_duration;
 
-                    let brightness_step = (total_brightness_shift as f32) / (total_num_steps as f32);
+                    let brightness_step = total_brightness_shift / (total_num_steps as f64);
 
                     // the last step is dedicated to setting the brightness exactly to
                     // new_brightness
@@ -657,9 +659,9 @@ impl Daemon {
                     }
 
                     for _ in 0..iterator_num_steps {
-                        current_brightness += brightness_step;
+                        self.brightness += brightness_step;
 
-                        let brightness_string = format!("{:.5}", current_brightness / 100.0);
+                        let brightness_string = format!("{:.5}", self.brightness / 100.0);
 
                         let mut command = self.create_xrandr_command_with_brightness(brightness_string);
 
