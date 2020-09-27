@@ -402,14 +402,105 @@ struct DaemonWrapper {
     daemon: UnsafeCell<Daemon>
 }
 
+impl DaemonWrapper {
+    async fn run(self) -> Result<()> {
+        let daemon = unsafe {
+            self.daemon.get().as_mut().unwrap()
         };
 
-        let file_utils = FileUtils {
-            project_directory,
-            file_open_options
+        daemon.refresh_configuration().await?;
+
+        register_sigterm_handler()?;
+
+        let mut listener = match UnixListener::bind(SOCKET_PATH) {
+            Ok(listener) => listener,
+            Err(e) => {
+                eprintln!("Error binding listener: {}", e);
+                fs::remove_file(SOCKET_PATH).await?;
+                UnixListener::bind(SOCKET_PATH)?
+            }
         };
 
-        file_utils.update_config_template()?;
+        // this is used as a shutdown signal
+        // if any message is sent over the channel, the dameon starts shutting down
+        let (tx, mut rx) = mpsc::channel::<()>(30);
+
+        println!("Brightness: {}", daemon.brightness.get());
+        println!("Mode: {}", daemon.mode.get());
+        println!("Displays: {:?}", *daemon.displays.read().await);
+
+        try_join!(
+            async move {
+                let mut incoming = listener.incoming();
+                while let Some(stream) = incoming.next().await {
+                    println!("Stream!");
+
+                    let daemon = unsafe {
+                        self.daemon.get().as_mut().unwrap()
+                    };
+
+                    let mut shutdown_channel = tx.clone();
+                    tokio::spawn(async move {
+                        match stream {
+                            Ok(mut stream) => {
+                                // Rust is amazing
+                                // the compiler figured out the type of program_input based on the call to
+                                // daemon.process_input 5 lines below
+                                let mut stream_buffer: [u8; 20] = [0; 20];
+
+                                let num_bytes: usize = stream.read(&mut stream_buffer[..]).await?;
+
+                                let program_input = BINCODE_OPTIONS.deserialize_from(&stream_buffer[..num_bytes]);
+                                match program_input {
+                                    Ok(program_input) => {
+                                        println!("Deserialized ProgramInput: {:?}", program_input);
+                                        let res = daemon.process_input(program_input, stream).await;
+                                        if let ProcessInputExitCode::Shutdown = res {
+                                            // leave the loop
+                                            // TODO see if you can just break
+                                            match shutdown_channel.send( () ).await {
+                                                Ok(_) => println!("SENT SHUTDOWN SIGNAL!"),
+                                                Err(e) => eprintln!("FAILED TO SEND SHUTDOWN SIGNAL! {}", e)
+                                            }
+                                        }
+                                    },
+                                    Err(err) => {
+                                        eprintln!("Error deserializing: {}", err);
+                                    }
+                                }
+                            }
+                            Err(_) => {
+                                match shutdown_channel.send( () ).await {
+                                    Ok(_) => println!("SENT SHUTDOWN SIGNAL!"),
+                                    Err(e) => eprintln!("FAILED TO SEND SHUTDOWN SIGNAL! {}", e)
+                                }
+                            }
+                        }
+
+                        std::io::Result::Ok( () )
+                    });
+                }
+
+                Ok( () )
+            },
+            async move {
+                rx.recv().await;
+                std::io::Result::<()>::Err( Error::new(ErrorKind::ConnectionAborted, "Shutting down daemon!") )
+            }
+        );
+
+        println!("EXITING RUN");
+
+        Ok(())
+    }
+
+    fn start(self, mut tokio_runtime: Runtime) {
+        println!("{:?}", tokio_runtime.block_on(self.run()));
+        tokio_runtime.shutdown_timeout(std::time::Duration::from_millis(1000));
+        println!("Shutdown tokio runtime!");
+    }
+}
+
 
         let config: DaemonOptions = {
             let configuration: DaemonOptions = (|| -> Result<DaemonOptions> {
