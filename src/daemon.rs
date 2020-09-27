@@ -633,7 +633,7 @@ impl Daemon {
         Ok(())
     }
 
-    fn process_input(&mut self, program_input: ProgramInput, socket: &mut UnixStream) {
+    async fn process_input(&mut self, program_input: ProgramInput, mut socket: UnixStream) -> ProcessInputExitCode {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
         let brightness = program_input.brightness;
@@ -642,14 +642,18 @@ impl Daemon {
         let toggle_nightlight = program_input.toggle_nightlight;
         let mut configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
-        let save_configuration = program_input.save_configuration;
+        let shutdown = program_input.shutdown;
 
-        let mut write_message = move |message: &str, log_socket_error: bool| {
-            if let Err(e) = socket.write_all(message.as_bytes()) {
-                if log_socket_error {
-                    eprintln!("Failed to write \"{}\" to socket: {}", message, e);
-                }
-            }
+        // queue messages into this and then push them all to the socket at the end
+        let mut messages: Vec<SocketMessage> = Vec::with_capacity(5);
+
+        let mut write_message = |message: String, log_socket_error: bool| {
+            let socket_message = SocketMessage {
+                message,
+                log_socket_error
+            };
+
+            (&mut messages).push(socket_message);
         };
 
         // have to use macros for these two because if they were closures they would need to share
@@ -668,49 +672,61 @@ impl Daemon {
         }
 
         if toggle_nightlight {
-            self.mode = !self.mode;
+            self.mode.set_value(!self.mode.get()).await;
 
-            (|| {
-                if self.config.use_redshift {
-                    if let Err(e) = self.refresh_redshift() {
-                        write_error!(&format!("Failed to refresh redshift: {}", e));
-                        return;
+            // janky alternative to an async closure
+            // this allows us to early-return from this block
+            // can't use a regular closure because then we wouldnt be able to use async/await
+            // inside of it
+            // can't use an async block inside of a regular one because then we would need to move all the
+            // captured variables into the block
+            // this is ugly but it works
+            loop {
+                if self.config.read().await.use_redshift {
+                    if let Err(e) = self.refresh_redshift().await {
+                        write_error!(format!("Failed to refresh redshift: {}", e));
+                        break;
                     }
                 }
                 else {
-                    if let Err(e) = self.refresh_brightness() {
-                        write_error!(&format!("Failed to refresh xrandr: {}", e));
-                        return;
+                    if let Err(e) = self.refresh_brightness().await {
+                        write_error!(format!("Failed to refresh xrandr: {}", e));
+                        break;
                     }
                 }
 
                 // could have used format! to make this a one-liner, but this allows the strings to be
                 // stored in static memory instead of having to be generated at runtime
-                if self.mode {
-                    write_error!("Enabled nightlight");
+                if self.mode.get() {
+                    write_success!("Enabled nightlight".to_owned());
                 }
                 else {
-                    write_error!("Disabled nightlight");
+                    write_success!("Disabled nightlight".to_owned());
                 }
-            })()
+
+                break;
+            };
         }
 
         match brightness {
             Some(brightness_change) => {
+                let current_brightness = self.brightness.get();
+
                 let new_brightness = {
                     let integer_representation = match brightness_change {
                         BrightnessChange::Set(new_brightness) => new_brightness,
                         BrightnessChange::Adjustment(brightness_shift) => {
-                            cmp::max(cmp::min(brightness_shift + (self.brightness as i8), 100), 0) as u8
+                            cmp::max(cmp::min(brightness_shift + (current_brightness as i8), 100), 0) as u8
                         }
                     };
 
                     integer_representation as f64
                 };
 
-                let total_brightness_shift = new_brightness - self.brightness;
+                let total_brightness_shift = new_brightness - current_brightness;
 
-                let fade_options = &self.config.fade_options;
+                // TODO don't clone this
+                let fade_options = &self.config.read().await.fade_options.clone();
 
                 let fade = {
                     // if it contains a value, use it
@@ -724,21 +740,21 @@ impl Daemon {
                 };
 
                 if !fade {
-                    self.brightness = new_brightness;
+                    self.brightness.set_value(new_brightness).await;
 
                     // this returns true if refresh_brightness reconfigured the display automatically
                     // dont want to reconfigure AGAIN
                     match self.refresh_brightness().await {
                         Ok(skip_configure_display) => {
-                            write_error!(&format!("Set brightness to {}%", self.brightness));
+                            write_success!(format!("Set brightness to {}%", self.brightness.get()));
 
                             if skip_configure_display {
                                 configure_display = false;
-                                write_error!("Automatically reconfigured displays!");
+                                write_success!("Automatically reconfigured displays!".to_owned());
                             }
                         },
                         Err(e) => {
-                            write_error!(&format!("Failed to refresh brightness: {}", e));
+                            write_error!(format!("Failed to refresh brightness: {}", e));
                         }
                     };
                 }
@@ -756,42 +772,42 @@ impl Daemon {
 
                     let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
 
-                    if let Ok(true) = self.refresh_brightness() {
+                    if let Ok(true) = self.refresh_brightness().await {
                         configure_display = false;
                     }
 
+                    let mut brightness_guard = self.brightness.lock_mut().await;
                     for _ in 0..iterator_num_steps {
-                        self.brightness += brightness_step;
+                        let brightness = self.brightness.get() + brightness_step;
 
-                        let brightness_string = format!("{:.5}", self.brightness / 100.0);
+                        brightness_guard.set(brightness);
 
-                        let mut command = self.create_xrandr_command_with_brightness(brightness_string);
+                        let brightness_string = format!("{:.5}", brightness / 100.0);
+
+                        let mut command = self.create_xrandr_command_with_brightness(brightness_string).await;
 
                         match command.spawn() {
                             Ok(call_handle) => {
                                 tokio::spawn(call_handle);
                             },
                             Err(e) => {
-                                write_error!(&format!("Failed to set brightness during fade: {}", e));
+                                write_error!(format!("Failed to set brightness during fade: {}", e));
                             }
                         };
 
-                        self.check_child_processes();
-
-                        // spin_sleep is more accurate than regular std::thread::sleep
-                        // we want our fades to be smooth, so the delay for each one must be as
-                        // consistent as possible
-                        spin_sleep::sleep(fade_step_delay);
+                        tokio::time::delay_for(fade_step_delay).await;
                     }
 
-                    self.brightness = new_brightness;
+                    brightness_guard.set(new_brightness);
 
-                    match self.refresh_brightness() {
+                    drop(brightness_guard);
+
+                    match self.refresh_brightness().await {
                         Ok(_) => {
-                            write_success!(&format!("Completed fade to brightness: {}", new_brightness));
+                            write_success!(format!("Completed fade to brightness: {}", new_brightness));
                         }
                         Err(e) => {
-                            write_error!(&format!("Failed to complete fade: {}", e));
+                            write_error!(format!("Failed to complete fade: {}", e));
                         }
                     }
                 }
@@ -802,28 +818,28 @@ impl Daemon {
         if let Some(property) = get_property {
             let property_value = match property {
                 GetProperty::Brightness => {
-                    format!("{}", &self.brightness)
+                    format!("{}", self.brightness.get())
                 },
                 GetProperty::Displays => {
-                    self.displays.join(" ")
+                    self.displays.read().await.join(" ")
                 },
                 GetProperty::Mode => {
-                    format!("{}", self.mode as i32)
+                    format!("{}", self.mode.get() as i32)
                 },
                 GetProperty::Config => {
-                    format!("{:?}", &self.config)
+                    format!("{:?}", &self.config.read().await)
                 }
             };
 
-            write_success!(&property_value);
+            write_success!(property_value);
         };
 
         if configure_display {
-                write_error!(&format!("Failed to reconfigure displays: {}", e));
             if let Err(e) = self.reconfigure_displays().await {
+                write_error!(format!("Failed to reconfigure displays: {}", e));
             }
             else {
-                write_success!("Successfully reconfigured displays!");
+                write_success!("Successfully reconfigured displays!".to_owned());
             }
         }
 
@@ -834,29 +850,50 @@ impl Daemon {
 
                     match config_result.await {
                         Ok(config) => {
-                            self.config = config;
+                            *self.config.write().await = config;
 
-                            write_success!("Successfully reloaded configuration!");
+                            write_success!("Successfully reloaded configuration!".to_owned());
                         }
                         Err(error) => {
-                            write_error!(&format!("Failed to parse configuration file: {}", error));
+                            write_error!(format!("Failed to parse configuration file: {}", error));
                         }
                     }
                 },
                 Err(e) => {
-                    write_error!(&format!("Failed to open configuration file for reloading: {}", e));
+                    write_error!(format!("Failed to open configuration file for reloading: {}", e));
                 }
             }
         }
 
-        if save_configuration {
-            if let Err(e) = self.save_configuration() {
-                write_error!(&format!("Failed to save configuration: {}", e));
+        if shutdown {
+            if let Err(e) = self.save_configuration().await {
+                write_error!(format!("Failed to save configuration: {}", e));
             }
             else {
-                write_success!("Successfully saved configuration!");
+                write_success!("Successfully saved configuration!".to_owned());
             }
+
+            return ProcessInputExitCode::Shutdown;
         }
+
+        // write all messages to the socket
+        tokio::spawn(
+            async move {
+                for message_struct in messages.into_iter() {
+                    let message = message_struct.message;
+                    if let Err(e) = socket.write_all(&message.as_bytes()).await {
+                        if message_struct.log_socket_error {
+                            eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                        }
+                    }
+                }
+
+                // cleanup; close connection
+                let _ = socket.shutdown(std::net::Shutdown::Both);
+            }
+        );
+
+        ProcessInputExitCode::Normal
     }
 
     async fn reconfigure_displays(&mut self) -> Result<()> {
