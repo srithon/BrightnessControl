@@ -503,26 +503,29 @@ impl DaemonWrapper {
     }
 }
 
+impl Daemon {
+    async fn new(file_utils: FileUtils) -> Result<Daemon> {
+        file_utils.update_config_template().await?;
 
         let config: DaemonOptions = {
-            let configuration: DaemonOptions = (|| -> Result<DaemonOptions> {
-                let (mut config_file, file_existed) = file_utils.open_configuration_file()?;
+                let (mut config_file, file_existed) = file_utils.open_configuration_file().await?;
 
+            let configuration: DaemonOptions = async move {
                 // file exists
                 if file_existed {
-                    if let Ok(config) = get_configuration_from_file(&mut config_file) {
+                    if let Ok(config) = get_configuration_from_file(&mut config_file).await {
                         return Ok(config);
                     }
                 }
                 else {
-                    overwrite_file_with_content(&mut config_file, CONFIG_TEMPLATE)?;
+                    overwrite_file_with_content(&mut config_file, CONFIG_TEMPLATE).await?;
                 }
 
                 let config = DaemonOptions::default();
 
                 // saves creating another instance of DaemonOptions::default()
-                return Ok(config);
-            })()?;
+                return std::io::Result::<DaemonOptions>::Ok(config);
+            }.await?;
 
             configuration
         };
@@ -531,11 +534,10 @@ impl DaemonWrapper {
 
         Ok(
             Daemon {
-                brightness: file_utils.get_written_brightness()?,
-                mode: file_utils.get_written_mode()?,
-                displays: file_utils.get_written_displays()?,
-                child_processes: VecDeque::new(),
-                config,
+                brightness: NonReadBlockingRWLock::new(file_utils.get_written_brightness().await?, ()),
+                mode: NonReadBlockingRWLock::new(file_utils.get_written_mode().await?, ()),
+                displays: RwLock::new(file_utils.get_written_displays().await?),
+                config: RwLock::new(config),
                 file_utils
             }
         )
