@@ -578,7 +578,8 @@ impl Daemon {
             }
         }
         else {
-            self.child_processes.push_back(call_handle);
+            // wait for it on its own
+            tokio::spawn(call_handle);
         }
 
         Ok(false)
@@ -596,8 +597,9 @@ impl Daemon {
         // turn on redshift
         let mut redshift_enable = Command::new("redshift");
         redshift_enable.arg("-O");
-        redshift_enable.arg(format!("{}", self.config.nightlight_options.redshift_temperature));
-        redshift_enable.spawn()?;
+        redshift_enable.arg(format!("{}", self.config.read().await.nightlight_options.redshift_temperature));
+        let call_handle = redshift_enable.spawn()?;
+        tokio::spawn(call_handle);
         Ok(())
     }
 
@@ -758,7 +760,7 @@ impl Daemon {
 
                         match command.spawn() {
                             Ok(call_handle) => {
-                                self.child_processes.push_back(call_handle);
+                                tokio::spawn(call_handle);
                             },
                             Err(e) => {
                                 write_error!(&format!("Failed to set brightness during fade: {}", e));
