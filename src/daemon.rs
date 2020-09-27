@@ -35,6 +35,14 @@ lazy_static! {
         let parsed_toml: DaemonOptions = toml::from_slice(CONFIG_TEMPLATE.as_bytes()).unwrap();
         parsed_toml
     };
+
+    pub static ref BINCODE_OPTIONS: DefaultOptions = {
+        let options = bincode::DefaultOptions::default();
+        options.with_fixint_encoding();
+        options
+    };
+}
+
 struct SocketMessage {
     message: String,
     log_socket_error: bool
@@ -42,10 +50,6 @@ struct SocketMessage {
 
 }
 
-pub fn get_bincode_options() -> DefaultOptions {
-    let options = bincode::DefaultOptions::default();
-    options.with_fixint_encoding();
-    options
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1068,8 +1072,7 @@ fn register_sigterm_handler() -> Result<()> {
                             save_configuration: true
                         };
 
-                        let bincode_options = get_bincode_options();
-                        if let Ok(binary_encoded_input) = bincode_options.serialize(&mock_save_daemon_input) {
+                        if let Ok(binary_encoded_input) = BINCODE_OPTIONS.serialize(&mock_save_daemon_input) {
                             let write_result = sock.write_all(&binary_encoded_input);
                             match write_result {
                                 Ok(_) => {

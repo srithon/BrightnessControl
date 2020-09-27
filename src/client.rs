@@ -103,7 +103,7 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
         }
     };
 
-    let bincode_options = get_bincode_options();
+    let bincode_options = &crate::daemon::BINCODE_OPTIONS;
     let binary_encoded_input = bincode_options.serialize(&program_input).unwrap();
 
     socket.write_all(&binary_encoded_input)?;
