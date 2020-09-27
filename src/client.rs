@@ -89,6 +89,8 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
         matches.is_present("configure_display"),
         matches.is_present("toggle_nightlight"),
         matches.is_present("reload_configuration"),
+        false,
+        // TODO interrupt_fade
         false
     );
 
