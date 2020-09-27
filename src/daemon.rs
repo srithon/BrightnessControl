@@ -35,6 +35,11 @@ lazy_static! {
         let parsed_toml: DaemonOptions = toml::from_slice(CONFIG_TEMPLATE.as_bytes()).unwrap();
         parsed_toml
     };
+struct SocketMessage {
+    message: String,
+    log_socket_error: bool
+}
+
 }
 
 pub fn get_bincode_options() -> DefaultOptions {
