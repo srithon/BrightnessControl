@@ -2,18 +2,24 @@ use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
-use tokio::sync::{ Mutex, MutexGuard };
-
 use lazy_static::lazy_static;
 
 use serde::{Serialize, Deserialize};
 
-use std::os::unix::net::{UnixStream, UnixListener};
+use tokio::{
+    prelude::*,
+    io::{ BufReader },
+    fs::{self, File, OpenOptions},
+    net::{ UnixStream, UnixListener },
+    stream::StreamExt,
+    process::{Command},
+    sync::{ RwLock, Mutex, MutexGuard, mpsc },
+    runtime::{self, Runtime},
+    try_join
+};
 
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Error, ErrorKind, Seek, Write, Read, Result};
+use std::io::{Error, ErrorKind, Write as SyncWrite, Result};
 use std::fmt::Display;
-use std::process::{Command, Child};
 
 use std::collections::VecDeque;
 use std::cell::{ Cell, UnsafeCell };
@@ -112,45 +118,45 @@ impl FileUtils {
     }
 
     // returns the file and whether or not it existed prior to opening it
-    fn open_configuration_file(&self) -> Result<(File, bool)> {
+    async fn open_configuration_file(&self) -> Result<(File, bool)> {
         let config_dir = self.project_directory.config_dir();
         let filepath = config_dir.join("config.toml");
 
         if !config_dir.exists() {
-            std::fs::create_dir(self.project_directory.config_dir())?;
+            fs::create_dir(self.project_directory.config_dir()).await?;
         }
 
-        let file_exists = std::fs::metadata(&filepath).is_ok();
-        Ok( (self.file_open_options.open(filepath)?, file_exists) )
+        let file_exists = fs::metadata(&filepath).await.is_ok();
+        Ok( (self.file_open_options.open(filepath).await?, file_exists) )
     }
 
-    fn open_cache_file_with_options(&self, file_name: &str, open_options: &OpenOptions) -> Result<File> {
+    async fn open_cache_file_with_options(&self, file_name: &str, open_options: &OpenOptions) -> Result<File> {
         let filepath = self.project_directory.cache_dir().join(file_name);
-        open_options.open(filepath)
+        open_options.open(filepath).await
     }
 
-    fn open_cache_file(&self, file_name: &str) -> Result<File> {
-        self.open_cache_file_with_options(file_name, &self.file_open_options)
+    async fn open_cache_file(&self, file_name: &str) -> Result<File> {
+        self.open_cache_file_with_options(file_name, &self.file_open_options).await
     }
 
-    fn get_mode_file(&self) -> Result<File> {
-        self.open_cache_file("mode")
+    async fn get_mode_file(&self) -> Result<File> {
+        self.open_cache_file("mode").await
     }
 
-    fn get_brightness_file(&self) -> Result<File> {
-        self.open_cache_file("brightness")
+    async fn get_brightness_file(&self) -> Result<File> {
+        self.open_cache_file("brightness").await
     }
 
-    fn get_displays_file(&self) -> Result<File> {
-        self.open_cache_file("displays")
+    async fn get_displays_file(&self) -> Result<File> {
+        self.open_cache_file("displays").await
     }
 
     // 0 for regular
     // 1 for night light
     // gets the mode written to disk; if invalid, writes a default and returns it
-    fn get_written_mode(&self) -> Result<bool> {
-        let mut mode_file = self.get_mode_file()?;
-        mode_file.set_len(1)?;
+    async fn get_written_mode(&self) -> Result<bool> {
+        let mut mode_file = self.get_mode_file().await?;
+        mode_file.set_len(1).await?;
 
         get_valid_data_or_write_default(&mut mode_file, &| data_in_file: &String | {
             if let Ok(num) = data_in_file.parse::<u8>() {
@@ -162,27 +168,27 @@ impl FileUtils {
 
             return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
 
-        }, false)
+        }, false).await
     }
 
     // loads displays in `displays` or writes down the real values
-    fn get_written_displays(&self) -> Result<Vec<String>> {
-        let mut displays_file = self.get_displays_file()?;
+    async fn get_written_displays(&self) -> Result<Vec<String>> {
+        let mut displays_file = self.get_displays_file().await?;
 
         let buffered_display_file_reader = BufReader::new(&mut displays_file);
         // filter out all invalid lines and then collect them into a Vec<String>
-        let read_displays = buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>();
+        let read_displays = buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>().await;
 
         if read_displays.len() > 0 {
             Ok(read_displays)
         }
         else {
-            configure_displays(&mut displays_file)
+            configure_displays(&mut displays_file).await
         }
     }
 
-    fn get_written_brightness(&self) -> Result<f64> {
-        let mut brightness_file = self.get_brightness_file()?;
+    async fn get_written_brightness(&self) -> Result<f64> {
+        let mut brightness_file = self.get_brightness_file().await?;
 
         get_valid_data_or_write_default(&mut brightness_file, &| data_in_file: &String | {
             // need to trim this because the newline character breaks the parse
@@ -194,24 +200,24 @@ impl FileUtils {
             }
 
             return Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"));
-        }, 100.0)
+        }, 100.0).await
     }
 
-    fn write_brightness(&self, brightness: f64) -> Result<()> {
-        let mut brightness_file = self.get_brightness_file()?;
-        overwrite_file_with_content(&mut brightness_file, brightness)?;
+    async fn write_brightness(&self, brightness: f64) -> Result<()> {
+        let mut brightness_file = self.get_brightness_file().await?;
+        overwrite_file_with_content(&mut brightness_file, brightness).await?;
         Ok(())
     }
 
-    fn write_mode(&self, mode: bool) -> Result<()> {
-        let mut mode_file = self.get_mode_file()?;
-        overwrite_file_with_content(&mut mode_file, mode)?;
+    async fn write_mode(&self, mode: bool) -> Result<()> {
+        let mut mode_file = self.get_mode_file().await?;
+        overwrite_file_with_content(&mut mode_file, mode).await?;
         Ok(())
     }
 
-    fn write_displays(&self, displays: &Vec<String>) -> Result<()> {
-        let mut displays_file = self.get_displays_file()?;
-        write_specified_displays_to_file(&mut displays_file, displays)?;
+    async fn write_displays(&self, displays: &Vec<String>) -> Result<()> {
+        let mut displays_file = self.get_displays_file().await?;
+        write_specified_displays_to_file(&mut displays_file, displays).await?;
         Ok(())
     }
 
@@ -219,21 +225,22 @@ impl FileUtils {
     // than the current version of BrightnessControl
     // if they do not match OR anything goes wrong during the check, overwrites
     // the template with CONFIG_TEMPLATE
-    fn update_config_template(&self) -> Result<()> {
+    async fn update_config_template(&self) -> Result<()> {
         // read header of current template
         let data_dir = self.project_directory.data_dir();
 
         if !data_dir.exists() {
-            fs::create_dir_all(data_dir)?;
+            fs::create_dir_all(data_dir).await?;
         }
 
         let template_filepath = data_dir.join("config_template.toml");
         let template_exists = template_filepath.exists();
 
-        let mut template_file = self.file_open_options.open(&template_filepath)?;
+        let mut template_file = self.file_open_options.open(&template_filepath).await?;
+        let mut template_file_clone = template_file.try_clone().await?;
 
         // this allows us to handle any errors in this section the same way
-        let overwrite_template_result = (|| -> Result<()> {
+        let overwrite_template_result = (|| async move {
             if template_exists {
                 // we only have to read until the first newline
                 // # a.b.c
@@ -241,13 +248,11 @@ impl FileUtils {
                 // 2 bytes extra incase 'a' becomes double(/triple)-digits
                 const BYTES_TO_READ: usize = 20;
 
-                let mut buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
+                let buffered_reader = BufReader::with_capacity(BYTES_TO_READ, &mut template_file);
 
-                buffered_reader.fill_buf()?;
+                // buffered_reader.fill_buf().await?;
 
-                if let Some(first_line) = buffered_reader.lines().nth(0) {
-                    let first_line = first_line?;
-
+                if let Ok(Some(first_line)) = buffered_reader.lines().next_line().await {
                     const NUM_CHARS_TO_IGNORE: usize = "# v".len();
                     // Strings from BufReader::lines do not include newlines at the
                     // end
@@ -275,12 +280,12 @@ impl FileUtils {
             // the cause of this error is irrelevant, so it doesnt need a
             // message
             Err(Error::new(ErrorKind::Other, ""))
-        })();
+        })().await;
 
         // dont care about the cause
         if let Err(_) = overwrite_template_result {
             // overwrite
-            overwrite_file_with_content(&mut template_file, CONFIG_TEMPLATE)?;
+            overwrite_file_with_content(&mut template_file_clone, CONFIG_TEMPLATE).await?;
         }
 
         Ok(())
@@ -377,12 +382,11 @@ where T: Copy {
 }
 
 struct Daemon {
-    brightness: f64,
-    mode: bool,
-    displays: Vec<String>,
-    config: DaemonOptions,
-    // VecDeque for FIFO
-    child_processes: VecDeque<Child>,
+    // these are primitives, so it doesn't matter
+    brightness: NonReadBlockingRWLock<f64, ()>,
+    mode: NonReadBlockingRWLock<bool, ()>,
+    displays: RwLock<Vec<String>>,
+    config: RwLock<DaemonOptions>,
     file_utils: FileUtils
 }
 
@@ -531,18 +535,18 @@ impl Daemon {
     }
 
     // boolean signals whether to skip display reconfiguration in process_input
-    fn refresh_brightness(&mut self) -> Result<bool> {
-        let mut call_handle = self.create_xrandr_command().spawn()?;
+    async fn refresh_brightness(&mut self) -> Result<bool> {
+        let call_handle = self.create_xrandr_command().await.spawn()?;
 
         if self.config.auto_reconfigure {
-            let exit_status = call_handle.wait()?;
+            let exit_status = call_handle.await?;
 
             // if the call fails, then the configuration is no longer valid
             // reconfigures the display and then tries again
             if !exit_status.success() {
                 // force reconfigure
-                self.reconfigure_displays()?;
-                self.create_xrandr_command().spawn()?;
+                self.reconfigure_displays().await?;
+                self.create_xrandr_command().await.spawn()?.await?;
                 return Ok(true);
             }
         }
@@ -561,7 +565,7 @@ impl Daemon {
         Ok(())
     }
 
-    fn enable_redshift(&mut self) -> Result<()> {
+    async fn enable_redshift(&mut self) -> Result<()> {
         // turn on redshift
         let mut redshift_enable = Command::new("redshift");
         redshift_enable.arg("-O");
@@ -570,9 +574,9 @@ impl Daemon {
         Ok(())
     }
 
-    fn refresh_redshift(&mut self) -> Result<()> {
         if self.mode {
-            self.enable_redshift()?;
+    async fn refresh_redshift(&mut self) -> Result<()> {
+            self.enable_redshift().await?;
         }
         else {
             self.clear_redshift()?;
@@ -581,11 +585,11 @@ impl Daemon {
         Ok(())
     }
 
-    fn refresh_configuration(&mut self) -> Result<()> {
+    async fn refresh_configuration(&mut self) -> Result<()> {
         // don't need the early return flag here
-        let _ = self.refresh_brightness()?;
         if self.config.use_redshift {
             self.refresh_redshift()?;
+        let _ = self.refresh_brightness().await?;
         }
 
         Ok(())
@@ -686,7 +690,7 @@ impl Daemon {
 
                     // this returns true if refresh_brightness reconfigured the display automatically
                     // dont want to reconfigure AGAIN
-                    match self.refresh_brightness() {
+                    match self.refresh_brightness().await {
                         Ok(skip_configure_display) => {
                             write_error!(&format!("Set brightness to {}%", self.brightness));
 
@@ -777,8 +781,8 @@ impl Daemon {
         };
 
         if configure_display {
-            if let Err(e) = self.reconfigure_displays() {
                 write_error!(&format!("Failed to reconfigure displays: {}", e));
+            if let Err(e) = self.reconfigure_displays().await {
             }
             else {
                 write_success!("Successfully reconfigured displays!");
@@ -786,11 +790,11 @@ impl Daemon {
         }
 
         if reload_configuration {
-            match self.file_utils.open_configuration_file() {
+            match self.file_utils.open_configuration_file().await {
                 Ok( (mut configuration_file, _) ) => {
                     let config_result = get_configuration_from_file(&mut configuration_file);
 
-                    match config_result {
+                    match config_result.await {
                         Ok(config) => {
                             self.config = config;
 
@@ -817,9 +821,9 @@ impl Daemon {
         }
     }
 
-    fn reconfigure_displays(&mut self) -> Result<()> {
-        let mut displays_file = self.file_utils.get_displays_file()?;
-        let new_displays = configure_displays(&mut displays_file)?;
+    async fn reconfigure_displays(&mut self) -> Result<()> {
+        let mut displays_file = self.file_utils.get_displays_file().await?;
+        let new_displays = configure_displays(&mut displays_file).await?;
 
         // immutable update
         // self.displays.clear();
@@ -830,7 +834,7 @@ impl Daemon {
         Ok(())
     }
 
-    fn create_xrandr_command_with_brightness(&self, brightness_string: String) -> Command {
+    async fn create_xrandr_command_with_brightness(&self, brightness_string: String) -> Command {
         let mut xrandr_call = Command::new("xrandr");
 
         for display in &self.displays {
@@ -856,10 +860,11 @@ impl Daemon {
     fn create_xrandr_command(&self) -> Command {
         let brightness_string = format!("{:.2}", *(&self.brightness) as f32 / 100.0);
         self.create_xrandr_command_with_brightness(brightness_string)
+    async fn create_xrandr_command(&self) -> Command {
     }
 }
 
-fn overwrite_file_with_content<T>(file: &mut File, new_content: T) -> Result<()>
+async fn overwrite_file_with_content<T>(file: &mut File, new_content: T) -> Result<()>
 where T: Display {
     file.seek(std::io::SeekFrom::Start(0))?;
 
@@ -874,7 +879,7 @@ where T: Display {
 }
 
 // where ....
-fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
+async fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
 where T: Display {
     let file_contents = {
         // wrapping in a closure allows the inner else and the
@@ -897,7 +902,7 @@ where T: Display {
         Ok(contents)
     }
     else {
-        overwrite_file_with_content(file, &default_value)?;
+        overwrite_file_with_content(&mut file_clone, &default_value).await?;
         Ok(default_value)
     }
 }
@@ -921,7 +926,7 @@ fn get_project_directory() -> Result<directories::ProjectDirs> {
     Ok(project_directory)
 }
 
-fn get_current_connected_displays() -> Result<Vec<String>> {
+async fn get_current_connected_displays() -> Result<Vec<String>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
     let command_output = xrandr_current.output()?;
@@ -954,7 +959,7 @@ fn get_current_connected_displays() -> Result<Vec<String>> {
     Ok(connected_displays)
 }
 
-fn write_specified_displays_to_file(displays_file: &mut std::fs::File, connected_displays: &Vec<String>) -> Result<()> {
+async fn write_specified_displays_to_file(displays_file: &mut File, connected_displays: &Vec<String>) -> Result<()> {
     // sum the lengths of each display name, and then add (number of names - 1) to account
     // for newline separators between each name
     // subtract 1 because there is no newline at the end
@@ -968,7 +973,7 @@ fn write_specified_displays_to_file(displays_file: &mut std::fs::File, connected
 
     // the above loop appends a newline to each display, including the last one
     // however, this call to set_len() cuts out this final newline
-    displays_file.set_len(displays_file_length as u64)?;
+    displays_file.set_len(displays_file_length as u64).await?;
 
     Ok(())
 }
@@ -977,7 +982,7 @@ fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Re
     let mut buffered_reader = BufReader::new(configuration_file);
 
     // fill buffer
-    if let Err(e) = buffered_reader.fill_buf() {
+    if let Err(e) = configuration_file.read_to_end(&mut configuration_buffer).await {
         eprintln!("Failed to read from configuration file! {}", e);
     }
 
@@ -1003,10 +1008,10 @@ fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Re
     return Ok(config);
 }
 
-fn configure_displays(displays_file: &mut std::fs::File) -> Result<Vec<String>> {
-    let connected_displays = get_current_connected_displays()?;
+async fn configure_displays(displays_file: &mut File) -> Result<Vec<String>> {
+    let connected_displays = get_current_connected_displays().await?;
 
-    write_specified_displays_to_file(displays_file, &connected_displays)?;
+    write_specified_displays_to_file(displays_file, &connected_displays).await?;
 
     Ok(connected_displays)
 }
