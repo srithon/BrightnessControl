@@ -548,6 +548,11 @@ impl DaemonWrapper {
             }
         );
 
+        match res {
+            Ok(_) => Ok( () ),
+            // this unpacks std::io::Result<( (), (), () )>
+            // and repacks it into a std::io::Result<( () )>
+            Err(e) => Err(e)
         }
     }
 
