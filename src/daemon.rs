@@ -2,6 +2,8 @@ use daemonize::Daemonize;
 use bincode::{Options, DefaultOptions};
 use directories::ProjectDirs;
 
+use tokio::sync::{ Mutex, MutexGuard };
+
 use lazy_static::lazy_static;
 
 use serde::{Serialize, Deserialize};
@@ -14,6 +16,7 @@ use std::fmt::Display;
 use std::process::{Command, Child};
 
 use std::collections::VecDeque;
+use std::cell::{ Cell, UnsafeCell };
 
 use std::cmp;
 
@@ -291,6 +294,66 @@ struct DaemonOptions {
 impl DaemonOptions {
     fn default() -> DaemonOptions {
         (*DEFAULT_CONFIG).clone()
+    }
+}
+
+struct MutexGuardRefWrapper<'a, T: Copy, K> {
+    internal: &'a mut T,
+    mutex_guard: MutexGuard<'a, K>
+}
+
+impl<'a, T, K> MutexGuardRefWrapper<'a, T, K>
+where T: Copy {
+    fn set(&mut self, new_value: T) {
+        *self.internal = new_value;
+    }
+
+    fn get_mutex_guard_contents(&'a mut self) -> &'a mut K {
+        &mut *self.mutex_guard
+    }
+}
+
+// a version of RWLock that does not block readers from reading while a writer writes
+// by providing them with a copy of the internal value
+// this is mainly intended for primitives which have cheap Copy implementations
+struct NonReadBlockingRWLock<T: Copy, K> {
+    internal: Cell<T>,
+    write_mutex: Mutex<K>
+}
+
+unsafe impl<T, K> Send for NonReadBlockingRWLock<T, K>
+where T: Copy {}
+
+unsafe impl<T, K> Sync for NonReadBlockingRWLock<T, K>
+where T: Copy {}
+
+impl<T, K> NonReadBlockingRWLock<T, K>
+where T: Copy {
+    fn new(initial_value: T, mutex_value: K) -> NonReadBlockingRWLock<T, K> {
+        NonReadBlockingRWLock {
+            internal: Cell::new(initial_value),
+            write_mutex: Mutex::new(mutex_value)
+        }
+    }
+
+    fn get(&self) -> T {
+        self.internal.get()
+    }
+
+    async fn set_value(&self, new_value: T) {
+        self.write_mutex.lock().await;
+        self.internal.set(new_value);
+    }
+
+    async fn lock_mut<'a>(&'a self) -> MutexGuardRefWrapper<'a, T, K> {
+        let guard = self.write_mutex.lock().await;
+
+        MutexGuardRefWrapper {
+            // need to get a mutable reference to internal without making the
+            // function take a mutable reference
+            internal: unsafe { self.internal.as_ptr().as_mut().unwrap() },
+            mutex_guard: guard
+        }
     }
 }
 
