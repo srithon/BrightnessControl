@@ -92,6 +92,25 @@ struct FileUtils {
 }
 
 impl FileUtils {
+    fn new() -> Result<FileUtils> {
+        let project_directory = get_project_directory()?;
+
+        let file_open_options = {
+            let mut file_open_options = OpenOptions::new();
+            file_open_options.read(true);
+            file_open_options.write(true);
+            file_open_options.create(true);
+            file_open_options
+        };
+
+        Ok(
+            FileUtils {
+                project_directory,
+                file_open_options
+            }
+        )
+    }
+
     // returns the file and whether or not it existed prior to opening it
     fn open_configuration_file(&self) -> Result<(File, bool)> {
         let config_dir = self.project_directory.config_dir();
@@ -433,28 +452,6 @@ impl Daemon {
 
             (stdout, stderr)
         };
-
-        let daemonize = Daemonize::new()
-            .pid_file(pid_file_path)
-            .working_directory(&self.file_utils.project_directory.cache_dir())
-            .stdout(stdout)
-            .stderr(stderr);
-
-        match daemonize.start() {
-            Ok(_) => println!("Success, daemonized"),
-            Err(e) => {
-                let stringified_error = e.to_string();
-
-                if stringified_error.contains("unable to lock pid file") {
-                    eprintln!("Daemon is already running!");
-                    eprintln!("To restart, run \"killall brightness_control\" before relaunching the daemon");
-                    // explicit exit to prevent the raw error from being printed
-                    std::process::exit(1);
-                }
-
-                return Err(Error::new(ErrorKind::Other, format!("Failed to daemonize: {}", stringified_error)));
-            }
-        }
 
         let listener = match UnixListener::bind(SOCKET_PATH) {
             Ok(listener) => listener,
@@ -1073,6 +1070,30 @@ pub fn daemon() -> Result<()> {
     daemon.refresh_configuration()?;
 
     register_sigterm_handler()?;
+
+    let daemonize = Daemonize::new()
+        .pid_file(pid_file_path)
+        .working_directory(&cache_dir)
+        // have to do this because the tokio runtime isnt created yet
+        // the corresponding functions in FileUtils are async
+        .stdout(stdout)
+        .stderr(stderr);
+
+    match daemonize.start() {
+        Ok(_) => println!("Success, daemonized"),
+        Err(e) => {
+            let stringified_error = e.to_string();
+
+            if stringified_error.contains("unable to lock pid file") {
+                eprintln!("Daemon is already running!");
+                eprintln!("To restart, run \"killall brightness_control\" before relaunching the daemon");
+                // explicit exit to prevent the raw error from being printed
+                std::process::exit(1);
+            }
+
+            return Err(Error::new(ErrorKind::Other, format!("Failed to daemonize: {}", stringified_error)));
+        }
+    }
 
     // enters the daemon event loop
     // (blocking)
