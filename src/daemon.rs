@@ -398,6 +398,10 @@ impl Daemon {
             file_open_options.write(true);
             file_open_options.create(true);
             file_open_options
+struct DaemonWrapper {
+    daemon: UnsafeCell<Daemon>
+}
+
         };
 
         let file_utils = FileUtils {
