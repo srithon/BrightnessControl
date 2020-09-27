@@ -57,6 +57,11 @@ pub enum GetProperty {
     Config
 }
 
+enum ProcessInputExitCode {
+    Normal,
+    Shutdown
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProgramInput {
     brightness: Option<BrightnessChange>,
@@ -65,11 +70,12 @@ pub struct ProgramInput {
     configure_display: bool,
     toggle_nightlight: bool,
     reload_configuration: bool,
-    save_configuration: bool
+    shutdown: bool,
+    interrupt_fade: bool
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, override_fade: Option<bool>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, save_configuration: bool) -> ProgramInput {
+    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, override_fade: Option<bool>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, shutdown: bool, interrupt_fade: bool) -> ProgramInput {
         ProgramInput {
             brightness,
             get_property,
@@ -77,7 +83,8 @@ impl ProgramInput {
             configure_display,
             toggle_nightlight,
             reload_configuration,
-            save_configuration
+            shutdown,
+            interrupt_fade
         }
     }
 
@@ -390,14 +397,6 @@ struct Daemon {
     file_utils: FileUtils
 }
 
-impl Daemon {
-    fn new(project_directory: ProjectDirs) -> Result<Daemon> {
-        let file_open_options = {
-            let mut file_open_options = OpenOptions::new();
-            file_open_options.read(true);
-            file_open_options.write(true);
-            file_open_options.create(true);
-            file_open_options
 struct DaemonWrapper {
     daemon: UnsafeCell<Daemon>
 }
@@ -539,93 +538,16 @@ impl DaemonWrapper {
         )
     }
 
-    fn run(&mut self) -> Result<()> {
-        let pid_file_path = self.file_utils.project_directory.cache_dir().join("daemon.pid");
-        let (stdout, stderr) = {
-            let mut log_file_open_options = OpenOptions::new();
-            log_file_open_options.create(true);
-            log_file_open_options.append(true);
-
-            let stdout = self.file_utils.open_cache_file_with_options("daemon_stdout.out", &log_file_open_options)?;
-            let stderr = self.file_utils.open_cache_file_with_options("daemon_stderr.err", &log_file_open_options)?;
-
-            (stdout, stderr)
-        };
-
-        let listener = match UnixListener::bind(SOCKET_PATH) {
-            Ok(listener) => listener,
-            Err(e) => {
-                eprintln!("Error binding listener: {}", e);
-                std::fs::remove_file(SOCKET_PATH)?;
-                UnixListener::bind(SOCKET_PATH)?
+    async fn save_configuration(&self) -> Result<()> {
+        let res = try_join!(
+            self.file_utils.write_mode(self.mode.get()),
+            self.file_utils.write_brightness(self.brightness.get()),
+            async {
+                let displays = self.displays.read().await;
+                self.file_utils.write_displays(&displays).await
             }
-        };
+        );
 
-        let bincode_options = get_bincode_options();
-
-        println!("Brightness: {}", self.brightness);
-        println!("Mode: {}", self.mode);
-        println!("Displays: {:?}", self.displays);
-
-        for stream in listener.incoming() {
-            match stream {
-                Ok(mut stream) => {
-                    let stream_reader = BufReader::with_capacity(20 as usize, &mut stream);
-                    // Rust is amazing
-                    // the compiler figured out the type of program_input based on the call to
-                    // self.process_input 5 lines below
-                    let program_input = bincode_options.deserialize_from(stream_reader);
-                    match program_input {
-                        Ok(program_input) => {
-                            println!("Deserialized ProgramInput: {:?}", program_input);
-                            self.process_input(program_input, &mut stream);
-                        },
-                        Err(err) => {
-                            eprintln!("Error deserializing: {}", err);
-                        }
-                    }
-
-                    let _ = stream.shutdown(std::net::Shutdown::Both);
-
-                    self.check_child_processes();
-                }
-                Err(_) => {
-                    break;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn save_configuration(&self) -> Result<()> {
-        self.file_utils.write_mode(self.mode)?;
-        self.file_utils.write_brightness(self.brightness)?;
-        self.file_utils.write_displays(&self.displays)?;
-        Ok(())
-    }
-
-    fn check_child_processes(&mut self) {
-        // keep deleting head until the head is not done yet
-        // or the list is empty
-        loop {
-            if let Some(handle) = self.child_processes.get_mut(0) {
-                match handle.try_wait() {
-                    Ok(option) => {
-                        if let Some(_) = option {
-                            self.child_processes.pop_front();
-                        }
-                    },
-                    Err(e) => {
-                        eprintln!("Failed to wait on child handle: {}", e);
-                        // TODO figure out if we should still pop this
-                        self.child_processes.pop_front();
-                        break;
-                    }
-                }
-            }
-            else {
-                break;
-            }
         }
     }
 
