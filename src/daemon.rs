@@ -1069,12 +1069,23 @@ fn register_sigterm_handler() -> Result<()> {
 }
 
 pub fn daemon() -> Result<()> {
-    let project_directory = get_project_directory()?;
+    let file_utils = FileUtils::new()?;
 
-    let mut daemon = Daemon::new(project_directory)?;
-    daemon.refresh_configuration()?;
+    let pid_file_path = &file_utils.project_directory.cache_dir().join("daemon.pid");
 
-    register_sigterm_handler()?;
+    let cache_dir = file_utils.project_directory.cache_dir();
+    
+    let (stdout, stderr) = {
+        let mut open_options = std::fs::OpenOptions::new();
+        open_options
+            .append(true)
+            .create(true);
+
+        let stdout = open_options.open(cache_dir.join("daemon_stdout.out"))?;
+        let stderr = open_options.open(cache_dir.join("daemon_stderr.err"))?;
+
+        (stdout, stderr)
+    };
 
     let daemonize = Daemonize::new()
         .pid_file(pid_file_path)
@@ -1100,9 +1111,20 @@ pub fn daemon() -> Result<()> {
         }
     }
 
-    // enters the daemon event loop
-    // (blocking)
-    daemon.run()?;
+    let mut tokio_runtime = runtime::Builder::new()
+        .core_threads(2)
+        .max_threads(4)
+        .threaded_scheduler()
+        // WAS enable_io
+        .enable_all()
+        .build()?;
 
-    Ok(())
+    let daemon = tokio_runtime.block_on(Daemon::new(file_utils))?;
+    let daemon_wrapper = DaemonWrapper {
+        daemon: UnsafeCell::new(daemon)
+    };
+
+    daemon_wrapper.start(tokio_runtime);
+
+    Ok( () )
 }
