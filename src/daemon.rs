@@ -397,6 +397,9 @@ struct Daemon {
     file_utils: FileUtils
 }
 
+unsafe impl Send for Daemon {}
+unsafe impl Sync for Daemon {}
+
 struct DaemonWrapper {
     daemon: UnsafeCell<Daemon>
 }
