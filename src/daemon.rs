@@ -574,7 +574,7 @@ impl Daemon {
     async fn refresh_brightness(&mut self) -> Result<bool> {
         let call_handle = self.create_xrandr_command().await.spawn()?;
 
-        if self.config.auto_reconfigure {
+        if self.config.read().await.auto_reconfigure {
             let exit_status = call_handle.await?;
 
             // if the call fails, then the configuration is no longer valid
@@ -598,7 +598,8 @@ impl Daemon {
         // turn off redshift
         let mut redshift_disable = Command::new("redshift");
         redshift_disable.arg("-x");
-        redshift_disable.spawn()?;
+        let call_handle = redshift_disable.spawn()?;
+        tokio::spawn(call_handle);
         Ok(())
     }
 
@@ -612,8 +613,8 @@ impl Daemon {
         Ok(())
     }
 
-        if self.mode {
     async fn refresh_redshift(&mut self) -> Result<()> {
+        if self.mode.get() {
             self.enable_redshift().await?;
         }
         else {
@@ -625,9 +626,9 @@ impl Daemon {
 
     async fn refresh_configuration(&mut self) -> Result<()> {
         // don't need the early return flag here
-        if self.config.use_redshift {
-            self.refresh_redshift()?;
         let _ = self.refresh_brightness().await?;
+        if self.config.read().await.use_redshift {
+            self.refresh_redshift().await?;
         }
 
         Ok(())
@@ -905,14 +906,14 @@ impl Daemon {
         // self.displays.clone_from(&new_displays);
 
         // mutable update
-        self.displays = new_displays;
+        *self.displays.write().await = new_displays;
         Ok(())
     }
 
     async fn create_xrandr_command_with_brightness(&self, brightness_string: String) -> Command {
         let mut xrandr_call = Command::new("xrandr");
 
-        for display in &self.displays {
+        for display in self.displays.read().await.iter() {
             xrandr_call.arg("--output");
             xrandr_call.arg(display);
         }
@@ -920,11 +921,13 @@ impl Daemon {
         xrandr_call.arg("--brightness")
             .arg(brightness_string);
 
-        if !self.config.use_redshift
+        let config = self.config.read().await;
+
+        if !config.use_redshift
         {
-            if self.mode {
+            if self.mode.get() {
                 xrandr_call.arg("--gamma")
-                    .arg(&self.config.nightlight_options.xrandr_gamma);
+                    .arg(&config.nightlight_options.xrandr_gamma);
             }
         }
 
@@ -932,23 +935,22 @@ impl Daemon {
 
     }
 
-    fn create_xrandr_command(&self) -> Command {
-        let brightness_string = format!("{:.2}", *(&self.brightness) as f32 / 100.0);
-        self.create_xrandr_command_with_brightness(brightness_string)
     async fn create_xrandr_command(&self) -> Command {
+        let brightness_string = format!("{:.2}", self.brightness.get() / 100.0);
+        self.create_xrandr_command_with_brightness(brightness_string).await
     }
 }
 
 async fn overwrite_file_with_content<T>(file: &mut File, new_content: T) -> Result<()>
 where T: Display {
-    file.seek(std::io::SeekFrom::Start(0))?;
+    file.seek(std::io::SeekFrom::Start(0)).await?;
 
     let formatted_new_content = format!("{}", new_content);
 
     // <<NOTE>> this can overflow? len() returns a usize
-    file.set_len(formatted_new_content.len() as u64)?;
+    file.set_len(formatted_new_content.len() as u64).await?;
 
-    write!(file, "{}", formatted_new_content)?;
+    file.write_all(&formatted_new_content.as_bytes()).await?;
 
     Ok(())
 }
@@ -956,14 +958,16 @@ where T: Display {
 // where ....
 async fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
 where T: Display {
+    let mut file_clone = file.try_clone().await?;
+
     let file_contents = {
         // wrapping in a closure allows the inner else and the
         // outer else clauses to share the same code
         // here, we want to return None if the file does not exist
         // or if the file's contents are not readable as a number
-        (|| -> std::io::Result<T> {
+        (|| async move {
             let mut buffer: Vec<u8> = Vec::new();
-            file.read_to_end(&mut buffer)?;
+            file.read_to_end(&mut buffer).await?;
 
             let string = unsafe {
                 String::from_utf8_unchecked(buffer)
@@ -971,7 +975,7 @@ where T: Display {
 
             data_validator(&string)
         })()
-    };
+    }.await;
 
     if let Ok(contents) = file_contents {
         Ok(contents)
@@ -995,7 +999,7 @@ fn get_project_directory() -> Result<directories::ProjectDirs> {
     let cache_directory = project_directory.cache_dir();
 
     if !cache_directory.exists() {
-        fs::create_dir_all(cache_directory)?;
+        std::fs::create_dir_all(cache_directory);
     }
 
     Ok(project_directory)
@@ -1004,7 +1008,7 @@ fn get_project_directory() -> Result<directories::ProjectDirs> {
 async fn get_current_connected_displays() -> Result<Vec<String>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
-    let command_output = xrandr_current.output()?;
+    let command_output = xrandr_current.output().await?;
     // the '&' operator dereferences ascii_code so that it can be compared with a regular u8
     // its original type is &u8
     let output_lines = command_output.stdout.split(| &ascii_code | ascii_code == '\n' as u8);
@@ -1043,7 +1047,8 @@ async fn write_specified_displays_to_file(displays_file: &mut File, connected_di
 
     // .iter() so that connected_displays is not moved
     for display in connected_displays.iter() {
-        writeln!(displays_file, "{}", display)?;
+        displays_file.write_all(display.as_bytes()).await?;
+        displays_file.write_all(b"\n").await?;
     }
 
     // the above loop appends a newline to each display, including the last one
@@ -1053,15 +1058,18 @@ async fn write_specified_displays_to_file(displays_file: &mut File, connected_di
     Ok(())
 }
 
-fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
-    let mut buffered_reader = BufReader::new(configuration_file);
+async fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
+    // 8 KB
+    const INITIAL_BUFFER_SIZE: usize = 8 * 1024;
+
+    let mut configuration_buffer = Vec::with_capacity(INITIAL_BUFFER_SIZE);
 
     // fill buffer
     if let Err(e) = configuration_file.read_to_end(&mut configuration_buffer).await {
         eprintln!("Failed to read from configuration file! {}", e);
     }
 
-    let parsed_toml: toml::Value = toml::from_slice(buffered_reader.buffer())?;
+    let parsed_toml: toml::Value = toml::from_slice(&configuration_buffer[..configuration_buffer.len()])?;
 
     let mut config = DaemonOptions::default();
 
@@ -1097,7 +1105,7 @@ fn register_sigterm_handler() -> Result<()> {
             // signal_hook 
             std::thread::spawn(|| {
                 // SEND INPUT TO DAEMON
-                match UnixStream::connect(SOCKET_PATH) {
+                match std::os::unix::net::UnixStream::connect(SOCKET_PATH) {
                     Ok(mut sock) => {
                         let mock_save_daemon_input = ProgramInput {
                             brightness: None,
@@ -1106,7 +1114,8 @@ fn register_sigterm_handler() -> Result<()> {
                             toggle_nightlight: false,
                             configure_display: false,
                             reload_configuration: false,
-                            save_configuration: true
+                            shutdown: true,
+                            interrupt_fade: false
                         };
 
                         if let Ok(binary_encoded_input) = BINCODE_OPTIONS.serialize(&mock_save_daemon_input) {
@@ -1120,8 +1129,6 @@ fn register_sigterm_handler() -> Result<()> {
                                 }
                             }
                         }
-
-                        let _ = sock.shutdown(std::net::Shutdown::Both);
 
                         // wait 1 second for it to finish
                         let one_second = std::time::Duration::from_millis(1000);
