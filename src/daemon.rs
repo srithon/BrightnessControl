@@ -1189,8 +1189,6 @@ fn register_sigterm_handler() -> Result<()> {
                 };
 
                 let _ = std::fs::remove_file(SOCKET_PATH);
-
-                std::process::abort()
             });
         })
     }?;
