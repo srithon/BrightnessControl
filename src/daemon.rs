@@ -336,6 +336,39 @@ impl DaemonOptions {
     }
 }
 
+struct BrightnessState {
+    // receiver end of channel in mutex
+    brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<BrightnessInput>>,
+    fade_notifier: mpsc::UnboundedSender<BrightnessInput>
+}
+
+impl BrightnessState {
+    fn new(initial_brightness: f64) -> BrightnessState {
+        let (tx, rx) = mpsc::unbounded_channel::<BrightnessInput>();
+
+        BrightnessState {
+            brightness: NonReadBlockingRWLock::new(initial_brightness, rx),
+            fade_notifier: tx
+        }
+    }
+
+    fn get(&self) -> f64 {
+        self.brightness.get()
+    }
+
+    fn get_fade_notifier(&self) -> mpsc::UnboundedSender<BrightnessInput> {
+        self.fade_notifier.clone()
+    }
+
+    fn try_lock_brightness<'a>(&'a self) -> Option<MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<BrightnessInput>>> {
+        self.brightness.try_lock_mut()
+    }
+
+    async fn lock_brightness<'a>(&'a self) -> MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<BrightnessInput>> {
+        self.brightness.lock_mut().await
+    }
+}
+
 struct MutexGuardRefWrapper<'a, T: Copy, K> {
     internal: &'a mut T,
     mutex_guard: MutexGuard<'a, K>
