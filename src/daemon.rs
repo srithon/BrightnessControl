@@ -384,6 +384,25 @@ where T: Copy {
         self.internal.set(new_value);
     }
 
+    fn try_lock_mut<'a>(&'a self) -> Option<MutexGuardRefWrapper<'a, T, K>> {
+        let guard = self.write_mutex.try_lock();
+
+        if let Ok(guard) = guard {
+            Some(
+                MutexGuardRefWrapper {
+                    // need to get a mutable reference to internal without making the
+                    // function take a mutable reference
+                    internal: unsafe { self.internal.as_ptr().as_mut().unwrap() },
+                    mutex_guard: guard
+                }
+            )
+        }
+        else {
+            None
+        }
+    }
+    
+
     async fn lock_mut<'a>(&'a self) -> MutexGuardRefWrapper<'a, T, K> {
         let guard = self.write_mutex.lock().await;
 
