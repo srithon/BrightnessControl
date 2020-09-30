@@ -690,7 +690,6 @@ impl Daemon {
         // struct elements
         let brightness = program_input.brightness;
         let get_property = program_input.get_property;
-        let fade = program_input.override_fade;
         let toggle_nightlight = program_input.toggle_nightlight;
         let mut configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
@@ -765,11 +764,12 @@ impl Daemon {
                 let current_brightness = self.brightness.get();
 
                 let new_brightness = {
-                    let integer_representation = match brightness_change {
-                        BrightnessChange::Set(new_brightness) => new_brightness,
-                        BrightnessChange::Adjustment(brightness_shift) => {
+                    let integer_representation = match brightness_change.brightness {
+                        Some(BrightnessChange::Set(new_brightness)) => new_brightness,
+                        Some(BrightnessChange::Adjustment(brightness_shift)) => {
                             cmp::max(cmp::min(brightness_shift + (current_brightness as i8), 100), 0) as u8
-                        }
+                        },
+                        None => current_brightness as u8
                     };
 
                     integer_representation as f64
@@ -779,11 +779,13 @@ impl Daemon {
 
                 // TODO don't clone this
                 let fade_options = &self.config.read().await.fade_options.clone();
-
                 let fade = {
-                    // if it contains a value, use it
-                    if let Some(fade) = fade {
-                        fade
+                    match &brightness_change.override_fade {
+                        None => total_brightness_shift.abs() as u8 > fade_options.threshold,
+                        Some(x) => *x
+                    }
+                };
+
                     }
                     else {
                         // if there is no override, then do the auto check
