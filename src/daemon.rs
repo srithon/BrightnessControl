@@ -1161,12 +1161,10 @@ fn register_sigterm_handler() -> Result<()> {
                         let mock_save_daemon_input = ProgramInput {
                             brightness: None,
                             get_property: None,
-                            override_fade: None,
                             toggle_nightlight: false,
                             configure_display: false,
                             reload_configuration: false,
                             shutdown: true,
-                            interrupt_fade: false
                         };
 
                         if let Ok(binary_encoded_input) = BINCODE_OPTIONS.serialize(&mock_save_daemon_input) {
