@@ -48,8 +48,11 @@ struct SocketMessage {
     log_socket_error: bool
 }
 
-}
-
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BrightnessInput {
+    brightness: Option<BrightnessChange>,
+    override_fade: Option<bool>,
+    interrupt_fade: bool
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,27 +76,23 @@ enum ProcessInputExitCode {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProgramInput {
-    brightness: Option<BrightnessChange>,
+    brightness: Option<BrightnessInput>,
     get_property: Option<GetProperty>,
-    override_fade: Option<bool>,
     configure_display: bool,
     toggle_nightlight: bool,
     reload_configuration: bool,
-    shutdown: bool,
-    interrupt_fade: bool
+    shutdown: bool
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessChange>, get_property: Option<GetProperty>, override_fade: Option<bool>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, shutdown: bool, interrupt_fade: bool) -> ProgramInput {
+    pub fn new(brightness: Option<BrightnessInput>, get_property: Option<GetProperty>, override_fade: Option<bool>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, shutdown: bool, interrupt_fade: bool) -> ProgramInput {
         ProgramInput {
             brightness,
             get_property,
-            override_fade,
             configure_display,
             toggle_nightlight,
             reload_configuration,
             shutdown,
-            interrupt_fade
         }
     }
 
