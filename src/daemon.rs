@@ -450,7 +450,7 @@ where T: Copy {
 
 struct Daemon {
     // these are primitives, so it doesn't matter
-    brightness: NonReadBlockingRWLock<f64, ()>,
+    brightness: BrightnessState,
     mode: NonReadBlockingRWLock<bool, ()>,
     displays: RwLock<Vec<String>>,
     config: RwLock<DaemonOptions>,
@@ -594,7 +594,7 @@ impl Daemon {
 
         Ok(
             Daemon {
-                brightness: NonReadBlockingRWLock::new(file_utils.get_written_brightness().await?, ()),
+                brightness: BrightnessState::new(file_utils.get_written_brightness().await?),
                 mode: NonReadBlockingRWLock::new(file_utils.get_written_mode().await?, ()),
                 displays: RwLock::new(file_utils.get_written_displays().await?),
                 config: RwLock::new(config),
