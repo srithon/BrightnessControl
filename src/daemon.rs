@@ -786,15 +786,46 @@ impl Daemon {
                     }
                 };
 
+                let optional_guard = {
+                    if brightness_change.interrupt_fade {
+                        // interrupt fade
+                        // if there is actually someone else modifying the brightness
+                        // note that this may not necessarily be a fade
+                        // if it is not a fade, then we have nothing to worry about
+                        // it will terminate on its own
+                        if let x @ Some(_) = self.brightness.try_lock_brightness() {
+                            x
+                        }
+                        else {
+                            // someone else has the lock
+                            // they may be fading
+                            // try sending input over the mpsc channel
+                            // respond?
+                            let send_channel = self.brightness.get_fade_notifier();
+                            match send_channel.send(brightness_change) {
+                                Ok(_) => {
+                                    write_success!("Successfully sent brightness information across channel".to_owned());
+                                },
+                                Err(e) => {
+                                    write_error!(format!("Failed to send information across channel! {}", e));
+                                }
+                            };
+
+                            return ProcessInputExitCode::Normal;
+                        }
                     }
                     else {
-                        // if there is no override, then do the auto check
-                        (total_brightness_shift.abs()) as u8 > fade_options.threshold 
+                        None
                     }
                 };
 
                 if !fade {
-                    self.brightness.set_value(new_brightness).await;
+                    if let Some(mut guard) = optional_guard {
+                        guard.set(new_brightness);
+                    }
+                    else {
+                        self.brightness.brightness.set_value(new_brightness).await;
+                    }
 
                     // this returns true if refresh_brightness reconfigured the display automatically
                     // dont want to reconfigure AGAIN
@@ -830,7 +861,15 @@ impl Daemon {
                         configure_display = false;
                     }
 
-                    let mut brightness_guard = self.brightness.lock_mut().await;
+                    let mut brightness_guard = {
+                        if let Some(guard) = optional_guard {
+                            guard
+                        }
+                        else {
+                            self.brightness.lock_brightness().await
+                        }
+                    };
+
                     for _ in 0..iterator_num_steps {
                         let brightness = self.brightness.get() + brightness_step;
 
