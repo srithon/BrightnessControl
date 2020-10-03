@@ -622,7 +622,7 @@ impl Daemon {
     }
 
     // boolean signals whether to skip display reconfiguration in process_input
-    async fn refresh_brightness(&mut self) -> Result<bool> {
+    async fn refresh_brightness(&self) -> Result<bool> {
         let call_handle = self.create_xrandr_command().await.spawn()?;
 
         if self.config.read().await.auto_reconfigure {
@@ -950,7 +950,7 @@ impl Daemon {
         ProcessInputExitCode::Normal
     }
 
-    async fn reconfigure_displays(&mut self) -> Result<()> {
+    async fn reconfigure_displays(&self) -> Result<()> {
         let mut displays_file = self.file_utils.get_displays_file().await?;
         let new_displays = configure_displays(&mut displays_file).await?;
 
