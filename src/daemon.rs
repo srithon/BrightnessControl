@@ -21,7 +21,6 @@ use tokio::{
 use std::io::{Error, ErrorKind, Write as SyncWrite, Result};
 use std::fmt::Display;
 
-use std::collections::VecDeque;
 use std::cell::{ Cell, UnsafeCell };
 
 use std::cmp;
