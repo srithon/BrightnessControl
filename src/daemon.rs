@@ -494,11 +494,13 @@ impl DaemonWrapper {
         try_join!(
             async move {
                 let mut incoming = listener.incoming();
+                let daemon_pointer = self.daemon.get();
+
                 while let Some(stream) = incoming.next().await {
                     println!("Stream!");
 
                     let daemon = unsafe {
-                        self.daemon.get().as_mut().unwrap()
+                        daemon_pointer.clone().as_mut().unwrap()
                     };
 
                     let mut shutdown_channel = tx.clone();
