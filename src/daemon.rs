@@ -752,33 +752,6 @@ impl Daemon {
         let reload_configuration = program_input.reload_configuration;
         let shutdown = program_input.shutdown;
 
-        // queue messages into this and then push them all to the socket at the end
-        let mut messages: Vec<SocketMessage> = Vec::with_capacity(5);
-
-        let mut write_message = |message: String, log_socket_error: bool| {
-            let socket_message = SocketMessage {
-                message,
-                log_socket_error
-            };
-
-            (&mut messages).push(socket_message);
-        };
-
-        // have to use macros for these two because if they were closures they would need to share
-        // a mutable reference to the write_message closure, which the borrow checker
-        // would not allow
-        macro_rules! write_success {
-            ($message:expr) => {
-                write_message($message, false);
-            }
-        }
-
-        macro_rules! write_error {
-            ($message:expr) => {
-                write_message($message, true);
-            }
-        }
-
         if toggle_nightlight {
             self.mode.set_value(!self.mode.get()).await;
 
@@ -792,13 +765,13 @@ impl Daemon {
             loop {
                 if self.config.read().await.use_redshift {
                     if let Err(e) = self.refresh_redshift().await {
-                        write_error!(format!("Failed to refresh redshift: {}", e));
+                        socket_holder.queue_error(format!("Failed to refresh redshift: {}", e));
                         break;
                     }
                 }
                 else {
                     if let Err(e) = self.refresh_brightness().await {
-                        write_error!(format!("Failed to refresh xrandr: {}", e));
+                        socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
                         break;
                     }
                 }
@@ -806,10 +779,10 @@ impl Daemon {
                 // could have used format! to make this a one-liner, but this allows the strings to be
                 // stored in static memory instead of having to be generated at runtime
                 if self.mode.get() {
-                    write_success!("Enabled nightlight".to_owned());
+                    socket_holder.queue_success("Enabled nightlight");
                 }
                 else {
-                    write_success!("Disabled nightlight".to_owned());
+                    socket_holder.queue_success("Disabled nightlight");
                 }
 
                 break;
