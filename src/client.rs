@@ -9,13 +9,8 @@ use std::io::{BufRead, BufReader};
 
 use crate::daemon::*;
 
-struct BrightnessSubcommand {
-    brightness_change: Option<BrightnessChange>,
-    override_fade: Option<bool>
-}
-
-fn check_brightness(matches: &ArgMatches) -> Result<BrightnessSubcommand> {
-    let brightness_change = {
+fn check_brightness(matches: &ArgMatches) -> Result<BrightnessInput> {
+    let brightness = {
         if let Some(new_brightness) = matches.value_of("set") {
             // unwrap because caller should be doing input validation
             Some(BrightnessChange::Set(new_brightness.parse::<u8>().unwrap()))
@@ -53,10 +48,13 @@ fn check_brightness(matches: &ArgMatches) -> Result<BrightnessSubcommand> {
         }
     };
 
+    let terminate_fade = matches.is_present("terminate_fade");
+
     return Ok(
-        BrightnessSubcommand {
-            brightness_change,
-            override_fade
+        BrightnessInput {
+            brightness,
+            override_fade,
+            terminate_fade
         }
     );
 }
@@ -83,15 +81,12 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
     let get_property = check_get_property(&matches);
 
     let program_input = ProgramInput::new(
-        brightness_subcommand.brightness_change,
+        brightness_subcommand,
         get_property,
-        brightness_subcommand.override_fade,
         matches.is_present("configure_display"),
         matches.is_present("toggle_nightlight"),
         matches.is_present("reload_configuration"),
         false,
-        // TODO interrupt_fade
-        false
     );
 
     // SEND INPUT TO DAEMON
