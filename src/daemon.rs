@@ -46,6 +46,7 @@ lazy_static! {
 }
 
 struct SocketMessageHolder {
+    // queue messages into this and then push them all to the socket at the end
     messages: Vec<SocketMessage>,
     socket: UnixStream
 }
@@ -445,7 +446,7 @@ where T: Copy {
 
 // a version of RWLock that does not block readers from reading while a writer writes
 // by providing them with a copy of the internal value
-// this is mainly intended for primitives which have cheap Copy implementations
+// this is meant to be used with primitives which have cheap Copy implementations
 struct NonReadBlockingRWLock<T: Copy, K> {
     internal: Cell<T>,
     write_mutex: Mutex<K>
@@ -506,6 +507,7 @@ where T: Copy {
     }
 }
 
+// separate RwLocks so they can be modified concurrently
 struct Daemon {
     // these are primitives, so it doesn't matter
     brightness: BrightnessState,
@@ -1315,7 +1317,7 @@ pub fn daemon() -> Result<()> {
     let pid_file_path = &file_utils.project_directory.cache_dir().join("daemon.pid");
 
     let cache_dir = file_utils.project_directory.cache_dir();
-    
+
     let (stdout, stderr) = {
         let mut open_options = std::fs::OpenOptions::new();
         open_options
