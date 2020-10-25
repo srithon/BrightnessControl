@@ -617,7 +617,7 @@ impl DaemonWrapper {
                 rx.recv().await;
                 std::io::Result::<()>::Err( Error::new(ErrorKind::ConnectionAborted, "Shutting down daemon!") )
             }
-        );
+        )?;
 
         println!("Successfully exitting run function");
 
@@ -939,18 +939,7 @@ impl Daemon {
                         // respond?
                         let send_channel = self.brightness.get_fade_notifier();
 
-                        // let mut socket_holder_clone = socket_holder.clone();
-
-                        match send_channel.send( (brightness_change, socket_holder) ) {
-                            Ok(_) => {
-                                // socket_holder_clone.queue_success("Successfully sent brightness information across channel");
-                            },
-                            Err(e) => {
-                                // socket_holder_clone.queue_error(format!("Failed to send information across channel! {}", e));
-                            }
-                        };
-
-                        // socket_holder_clone.consume();
+                        let _ = send_channel.send( (brightness_change, socket_holder) );
 
                         return;
                     }
@@ -1032,7 +1021,7 @@ impl Daemon {
                         let mut delay_future = tokio::time::delay_for(fade_step_delay);
 
                         // this has to be mutable to call recv() on it
-                        let mut receiver = &mut *brightness_guard.mutex_guard;
+                        let receiver = &mut *brightness_guard.mutex_guard;
 
                         loop {
                             select! {
