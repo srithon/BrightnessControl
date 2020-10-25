@@ -114,7 +114,7 @@ cargo install --path . --root ~/.local/
 ### Configuring Redshift
 *Change redshift's adjustment mode*
 ```
-sed -i 's/adjustment-method=randr/adjustment-method=vidmode' ~/.config/redshift.conf
+sed -i 's/adjustment-method=randr/adjustment-method=vidmode/' ~/.config/redshift.conf
 ```
 
 ## Usage
