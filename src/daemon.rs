@@ -855,7 +855,7 @@ impl Daemon {
 
         if brightness_change.is_active() {
             // let process_brightness_input handle the socket holder
-            self.process_brightness_input(brightness_change, None, socket_holder).await;
+            self.process_brightness_input(brightness_change, socket_holder).await;
         }
         else {
             // otherwise, consume it here
