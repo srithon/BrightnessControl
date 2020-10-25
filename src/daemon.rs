@@ -76,7 +76,7 @@ impl SocketMessageHolder {
     }
 
     // NOTE remember to consume before it goes out of scope
-    fn consume(self) {
+    fn consume(mut self) {
         // write all messages to the socket
         tokio::spawn(
             async move {
