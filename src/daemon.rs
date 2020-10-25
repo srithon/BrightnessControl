@@ -742,7 +742,7 @@ impl Daemon {
         Ok(())
     }
 
-    async fn process_input(&mut self, program_input: ProgramInput, mut socket: UnixStream) -> ProcessInputExitCode {
+    async fn process_input(&mut self, program_input: ProgramInput, mut socket_holder: SocketMessageHolder) -> ProcessInputExitCode {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
         let brightness = program_input.brightness;
