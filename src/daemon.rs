@@ -806,7 +806,7 @@ impl Daemon {
                     format!("{}", self.mode.get() as i32)
                 },
                 GetProperty::Config => {
-                    format!("{:?}", &self.config.read().await)
+                    format!("{:?}", *self.config.read().await)
                 }
             };
 
