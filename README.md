@@ -14,6 +14,8 @@ To use `redshift` instead of `xrandr` for the blue light filter, set `use_redshi
 
 Since version `1.4.5`, `BrightnessControl` can smoothly fade between brightness levels. More information on brightness fading can be found in the configuration template.
 
+Since version `1.6.0`, `BrightnessControl` processes input asynchronously.
+
 ***
 
 Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
@@ -146,6 +148,16 @@ $ brightness_control b --set 80
 _To Set the Brightness to 50% Without Fading_
 ```
 $ brightness_control b -ns80
+```
+
+_To Terminate the Current Brightness Fade_
+```
+$ brightness_control b -t
+```
+
+_To Terminate/Interrupt the Current Brightness Fade and Decrement the Brightness by 10%_
+```
+$ brightness_control b -td10
 ```
 
 *To Toggle Night Light*
