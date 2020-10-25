@@ -95,6 +95,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             (@group action =>
                 (@arg start: -s --start "Attempts to start the daemon. The process will not be tied to the process that runs it")
             )
+            (@arg no_fork: -n --("no-fork") requires[start] "Does not fork the process when starting the daemon; this generally means that it will be tied to the shell that starts it")
         )
     ).global_setting(AppSettings::ArgRequiredElseHelp)
 }
@@ -108,7 +109,7 @@ fn main() -> Result<()> {
         match matches.subcommand() {
             ("daemon", Some(sub_app)) => {
                 if sub_app.is_present("start") {
-                    daemon::daemon()?;
+                    daemon::daemon(!sub_app.is_present("no_fork"))?;
                 }
             },
             ("config", Some(sub_app)) => {

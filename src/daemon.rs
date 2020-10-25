@@ -1311,7 +1311,7 @@ fn register_sigterm_handler() -> Result<()> {
     Ok(())
 }
 
-pub fn daemon() -> Result<()> {
+pub fn daemon(fork: bool) -> Result<()> {
     let file_utils = FileUtils::new()?;
 
     let pid_file_path = &file_utils.project_directory.cache_dir().join("daemon.pid");
@@ -1330,27 +1330,29 @@ pub fn daemon() -> Result<()> {
         (stdout, stderr)
     };
 
-    let daemonize = Daemonize::new()
-        .pid_file(pid_file_path)
-        .working_directory(&cache_dir)
-        // have to do this because the tokio runtime isnt created yet
-        // the corresponding functions in FileUtils are async
-        .stdout(stdout)
-        .stderr(stderr);
+    if fork {
+        let daemonize = Daemonize::new()
+            .pid_file(pid_file_path)
+            .working_directory(&cache_dir)
+            // have to do this because the tokio runtime isnt created yet
+            // the corresponding functions in FileUtils are async
+            .stdout(stdout)
+            .stderr(stderr);
 
-    match daemonize.start() {
-        Ok(_) => println!("Success, daemonized"),
-        Err(e) => {
-            let stringified_error = e.to_string();
+        match daemonize.start() {
+            Ok(_) => println!("Success, daemonized"),
+            Err(e) => {
+                let stringified_error = e.to_string();
 
-            if stringified_error.contains("unable to lock pid file") {
-                eprintln!("Daemon is already running!");
-                eprintln!("To restart, run \"killall brightness_control\" before relaunching the daemon");
-                // explicit exit to prevent the raw error from being printed
-                std::process::exit(1);
+                if stringified_error.contains("unable to lock pid file") {
+                    eprintln!("Daemon is already running!");
+                    eprintln!("To restart, run \"killall brightness_control\" before relaunching the daemon");
+                    // explicit exit to prevent the raw error from being printed
+                    std::process::exit(1);
+                }
+
+                return Err(Error::new(ErrorKind::Other, format!("Failed to daemonize: {}", stringified_error)));
             }
-
-            return Err(Error::new(ErrorKind::Other, format!("Failed to daemonize: {}", stringified_error)));
         }
     }
 
