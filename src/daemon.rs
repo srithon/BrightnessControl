@@ -105,7 +105,7 @@ struct SocketMessage {
 pub struct BrightnessInput {
     pub brightness: Option<BrightnessChange>,
     pub override_fade: Option<bool>,
-    pub interrupt_fade: bool
+    pub terminate_fade: bool
 }
 
 #[derive(Serialize, Deserialize, Debug)]
