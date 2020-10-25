@@ -53,6 +53,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
 
     clap_app!(BrightnessControl =>
         (@setting VersionlessSubcommands)
+        (@setting ArgsNegateSubcommands)
         (version: crate_version!())
         (author: "Sridaran Thoniyil")
         (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
@@ -66,17 +67,17 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg set: -s --set +takes_value value_name[PERCENTAGE] {percentage_validator} "Sets the current brightness to %")
             )
             (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
-            (@arg force_fade: -f --fade "Overrides the auto-fade functionality and fades regardless of the current configuration")
-            (@arg force_no_fade: -n --("no-fade") "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
+            (@arg force_fade: -f --fade requires[action] "Overrides the auto-fade functionality and fades regardless of the current configuration")
+            (@arg force_no_fade: -n --("no-fade") requires[action] "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
             (@arg terminate_fade: -t --("terminate-fade") required_unless[action] "Terminates the current fade if one is currently running; this can be combined with one")
         )
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
             (visible_alias: "n")
-            (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@group action =>
                 (@arg toggle_nightlight: -t --toggle "Toggles the nightlight")
             )
+            (@arg quiet: -q --quiet requires[action] "Do not wait for the Daemon's output before terminating")
         )
         (@subcommand config =>
             (about: "Holds commands involving daemon configuration")
@@ -87,7 +88,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             )
         )
         (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'")
-        (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
+        (@arg configure_display: -c --("configure-display") conflicts_with[get] "Uses the current display configuration for future calls to BrightnessControl")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
             (visible_alias: "d")
