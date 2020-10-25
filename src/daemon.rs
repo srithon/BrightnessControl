@@ -589,8 +589,8 @@ impl DaemonWrapper {
                                             // leave the loop
                                             // TODO see if you can just break
                                             match shutdown_channel.send( () ).await {
-                                                Ok(_) => println!("SENT SHUTDOWN SIGNAL!"),
-                                                Err(e) => eprintln!("FAILED TO SEND SHUTDOWN SIGNAL! {}", e)
+                                                Ok(_) => println!("Sent shutdown signal!"),
+                                                Err(e) => eprintln!("Failed to send shutdown signal! {}", e)
                                             }
                                         }
                                     },
@@ -601,8 +601,8 @@ impl DaemonWrapper {
                             }
                             Err(_) => {
                                 match shutdown_channel.send( () ).await {
-                                    Ok(_) => println!("SENT SHUTDOWN SIGNAL!"),
-                                    Err(e) => eprintln!("FAILED TO SEND SHUTDOWN SIGNAL! {}", e)
+                                    Ok(_) => println!("Sent shutdown signal!"),
+                                    Err(e) => eprintln!("Failed to send shutdown signal! {}", e)
                                 }
                             }
                         }
@@ -619,7 +619,7 @@ impl DaemonWrapper {
             }
         );
 
-        println!("EXITING RUN");
+        println!("Successfully exitting run function");
 
         Ok(())
     }
