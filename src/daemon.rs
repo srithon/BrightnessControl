@@ -438,10 +438,6 @@ where T: Copy {
     fn set(&mut self, new_value: T) {
         *self.internal = new_value;
     }
-
-    fn get_mutex_guard_contents(&'a mut self) -> &'a mut K {
-        &mut *self.mutex_guard
-    }
 }
 
 // a version of RWLock that does not block readers from reading while a writer writes
