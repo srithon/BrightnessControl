@@ -1156,7 +1156,7 @@ fn get_project_directory() -> Result<directories::ProjectDirs> {
     let cache_directory = project_directory.cache_dir();
 
     if !cache_directory.exists() {
-        std::fs::create_dir_all(cache_directory);
+        std::fs::create_dir_all(cache_directory)?;
     }
 
     Ok(project_directory)
