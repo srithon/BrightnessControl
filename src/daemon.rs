@@ -24,6 +24,8 @@ use std::fmt::Display;
 
 use std::cell::{ Cell, UnsafeCell };
 
+use std::collections::VecDeque;
+
 use std::cmp;
 
 pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
