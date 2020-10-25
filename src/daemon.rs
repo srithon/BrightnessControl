@@ -397,13 +397,13 @@ impl DaemonOptions {
 
 struct BrightnessState {
     // receiver end of channel in mutex
-    brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<BrightnessInput>>,
-    fade_notifier: mpsc::UnboundedSender<BrightnessInput>
+    brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>,
+    fade_notifier: mpsc::UnboundedSender<(BrightnessInput, SocketMessageHolder)>
 }
 
 impl BrightnessState {
     fn new(initial_brightness: f64) -> BrightnessState {
-        let (tx, rx) = mpsc::unbounded_channel::<BrightnessInput>();
+        let (tx, rx) = mpsc::unbounded_channel::<(BrightnessInput, SocketMessageHolder)>();
 
         BrightnessState {
             brightness: NonReadBlockingRWLock::new(initial_brightness, rx),
@@ -415,15 +415,15 @@ impl BrightnessState {
         self.brightness.get()
     }
 
-    fn get_fade_notifier(&self) -> mpsc::UnboundedSender<BrightnessInput> {
+    fn get_fade_notifier(&self) -> mpsc::UnboundedSender<(BrightnessInput, SocketMessageHolder)> {
         self.fade_notifier.clone()
     }
 
-    fn try_lock_brightness<'a>(&'a self) -> Option<MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<BrightnessInput>>> {
+    fn try_lock_brightness<'a>(&'a self) -> Option<MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>> {
         self.brightness.try_lock_mut()
     }
 
-    async fn lock_brightness<'a>(&'a self) -> MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<BrightnessInput>> {
+    async fn lock_brightness<'a>(&'a self) -> MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>> {
         self.brightness.lock_mut().await
     }
 }
