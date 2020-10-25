@@ -971,6 +971,8 @@ impl Daemon {
                 };
             }
             else {
+                self.brightness.is_fading.set(true);
+
                 // fade
                 let total_num_steps = fade_options.total_duration / fade_options.step_duration;
 
@@ -1034,12 +1036,15 @@ impl Daemon {
                                     // iteration of the loop
                                     if terminate_fade {
                                         socket_holder.consume();
+                                        self.brightness.is_fading.set(false);
                                         continue 'base_loop;
                                     }
                                 }
                             };
                         };
                     }
+
+                    self.brightness.is_fading.set(false);
 
                     break 'outer_fade;
                 };
