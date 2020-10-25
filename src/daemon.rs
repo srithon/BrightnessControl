@@ -108,6 +108,12 @@ pub struct BrightnessInput {
     pub terminate_fade: bool
 }
 
+impl BrightnessInput {
+    fn is_active(&self) -> bool {
+        self.brightness.is_some() || self.terminate_fade
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum BrightnessChange {
     Adjustment(i8),
