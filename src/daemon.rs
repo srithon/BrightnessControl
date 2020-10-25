@@ -887,7 +887,7 @@ impl Daemon {
                 let integer_representation = match brightness_change.brightness {
                     Some(BrightnessChange::Set(new_brightness)) => new_brightness,
                     Some(BrightnessChange::Adjustment(brightness_shift)) => {
-                        cmp::max(cmp::min(brightness_shift + (current_brightness as i8), 100), 0) as u8
+                        cmp::max(cmp::min(brightness_shift as i16 + (current_brightness as i16), 100 as i16), 0) as u8
                     },
                     None => current_brightness as u8
                 };
