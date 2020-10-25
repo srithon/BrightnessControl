@@ -407,6 +407,9 @@ struct BrightnessState {
     is_fading: Cell<bool>
 }
 
+unsafe impl Send for BrightnessState {}
+unsafe impl Sync for BrightnessState {}
+
 impl BrightnessState {
     fn new(initial_brightness: f64) -> BrightnessState {
         let (tx, rx) = mpsc::unbounded_channel::<(BrightnessInput, SocketMessageHolder)>();
