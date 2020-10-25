@@ -576,7 +576,7 @@ impl DaemonWrapper {
                                 match program_input {
                                     Ok(program_input) => {
                                         println!("Deserialized ProgramInput: {:?}", program_input);
-                                        let res = daemon.process_input(program_input, stream).await;
+                                        let res = daemon.process_input(program_input, SocketMessageHolder::new(stream)).await;
                                         if let ProcessInputExitCode::Shutdown = res {
                                             // leave the loop
                                             // TODO see if you can just break
