@@ -68,6 +68,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@arg force_fade: -f --fade "Overrides the auto-fade functionality and fades regardless of the current configuration")
             (@arg force_no_fade: -n --("no-fade") "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
+            (@arg terminate_fade: -t --("terminate-fade") required_unless[action] "Terminates the current fade if one is currently running; this can be combined with one")
         )
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
