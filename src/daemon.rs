@@ -805,15 +805,15 @@ impl Daemon {
                 }
             };
 
-            write_success!(property_value);
+            socket_holder.queue_success(property_value);
         };
 
         if configure_display {
             if let Err(e) = self.reconfigure_displays().await {
-                write_error!(format!("Failed to reconfigure displays: {}", e));
+                socket_holder.queue_error(format!("Failed to reconfigure displays: {}", e));
             }
             else {
-                write_success!("Successfully reconfigured displays!".to_owned());
+                socket_holder.queue_success("Successfully reconfigured displays!");
             }
         }
 
@@ -826,25 +826,25 @@ impl Daemon {
                         Ok(config) => {
                             *self.config.write().await = config;
 
-                            write_success!("Successfully reloaded configuration!".to_owned());
+                            socket_holder.queue_success("Successfully reloaded configuration!");
                         }
                         Err(error) => {
-                            write_error!(format!("Failed to parse configuration file: {}", error));
+                            socket_holder.queue_error(format!("Failed to parse configuration file: {}", error));
                         }
                     }
                 },
                 Err(e) => {
-                    write_error!(format!("Failed to open configuration file for reloading: {}", e));
+                    socket_holder.queue_error(format!("Failed to open configuration file for reloading: {}", e));
                 }
             }
         }
 
         if shutdown {
             if let Err(e) = self.save_configuration().await {
-                write_error!(format!("Failed to save configuration: {}", e));
+                socket_holder.queue_error(format!("Failed to save configuration: {}", e));
             }
             else {
-                write_success!("Successfully saved configuration!".to_owned());
+                socket_holder.queue_success("Successfully saved configuration!");
             }
 
             return ProcessInputExitCode::Shutdown;
