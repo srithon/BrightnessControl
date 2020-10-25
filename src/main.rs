@@ -24,10 +24,10 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
     };
 
     let property_validator = |arg: String| {
-        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, and [m]ode";
+        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, [m]ode and [i]s_fading";
 
         if arg.len() == 1 {
-            const CHARS: &[char] = &['b', 'c', 'd', 'm'];
+            const CHARS: &[char] = &['b', 'c', 'd', 'm', 'i'];
             let arg_char = arg.chars().nth(0).unwrap();
             let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
 
@@ -39,7 +39,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             }
         }
         else {
-            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode"];
+            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode", "is_fading"];
             let valid = OPTIONS.iter().any(|prop| arg.eq_ignore_ascii_case(prop));
 
             return if !valid {
@@ -87,7 +87,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
-        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'")
+        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', [i]s_fading, or 'c[onfig]'")
         (@arg configure_display: -c --("configure-display") conflicts_with[get] "Uses the current display configuration for future calls to BrightnessControl")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")

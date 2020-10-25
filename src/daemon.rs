@@ -127,6 +127,7 @@ pub enum BrightnessChange {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum GetProperty {
     Brightness,
+    IsFading,
     Mode,
     Displays,
     Config

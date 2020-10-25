@@ -68,6 +68,7 @@ fn check_get_property(matches: &ArgMatches) -> Option<GetProperty> {
                 'm' => Some(GetProperty::Mode),
                 'd' => Some(GetProperty::Displays),
                 'c' => Some(GetProperty::Config),
+                'i' => Some(GetProperty::IsFading),
                 _ => None
             }
         }
