@@ -135,7 +135,7 @@ enum ProcessInputExitCode {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProgramInput {
-    brightness: Option<BrightnessInput>,
+    brightness: BrightnessInput,
     get_property: Option<GetProperty>,
     configure_display: bool,
     toggle_nightlight: bool,
@@ -144,7 +144,7 @@ pub struct ProgramInput {
 }
 
 impl ProgramInput {
-    pub fn new(brightness: Option<BrightnessInput>, get_property: Option<GetProperty>, override_fade: Option<bool>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, shutdown: bool, interrupt_fade: bool) -> ProgramInput {
+    pub fn new(brightness: BrightnessInput, get_property: Option<GetProperty>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, shutdown: bool) -> ProgramInput {
         ProgramInput {
             brightness,
             get_property,
