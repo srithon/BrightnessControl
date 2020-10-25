@@ -1265,7 +1265,11 @@ fn register_sigterm_handler() -> Result<()> {
                 match std::os::unix::net::UnixStream::connect(SOCKET_PATH) {
                     Ok(mut sock) => {
                         let mock_save_daemon_input = ProgramInput {
-                            brightness: None,
+                            brightness: BrightnessInput {
+                                brightness: None,
+                                override_fade: None,
+                                terminate_fade: false
+                            },
                             get_property: None,
                             toggle_nightlight: false,
                             configure_display: false,
