@@ -745,10 +745,10 @@ impl Daemon {
     async fn process_input(&mut self, program_input: ProgramInput, mut socket_holder: SocketMessageHolder) -> ProcessInputExitCode {
         // avoided using destructuring because destructuring relies entirely on the order of the
         // struct elements
-        let brightness = program_input.brightness;
+        let brightness_change = program_input.brightness;
         let get_property = program_input.get_property;
         let toggle_nightlight = program_input.toggle_nightlight;
-        let mut configure_display = program_input.configure_display;
+        let configure_display = program_input.configure_display;
         let reload_configuration = program_input.reload_configuration;
         let shutdown = program_input.shutdown;
 
