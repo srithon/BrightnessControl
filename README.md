@@ -28,6 +28,8 @@ When the daemon is started, it loads the following values from disk
 * displays: list of connected display adapters
   * stored in `~/.cache/brightnesscontrol/displays`
 
+**NOTE**: multi-monitor displays are not yet functional. Until then, you can manually edit the `displays` cache file while the daemon is not running and remove all but one of the displays. This will be fixed in the `1.6.0` release.
+
 If the contents of either `brightness` or `mode` are invalid, they are automatically defaulted and overwritten
 
 If the `displays` file is empty or non-existent, it will automatically be populated with the current display configuration
