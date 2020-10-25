@@ -810,6 +810,16 @@ impl Daemon {
                 },
                 GetProperty::Config => {
                     format!("{:?}", *self.config.read().await)
+                },
+                GetProperty::IsFading => {
+                    // return "1" if currently fading
+                    // else "0"
+                    if self.brightness.is_fading.get() {
+                        "1"
+                    }
+                    else {
+                        "0"
+                    }.to_owned()
                 }
             };
 
