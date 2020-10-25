@@ -403,7 +403,8 @@ impl DaemonOptions {
 struct BrightnessState {
     // receiver end of channel in mutex
     brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>,
-    fade_notifier: mpsc::UnboundedSender<(BrightnessInput, SocketMessageHolder)>
+    fade_notifier: mpsc::UnboundedSender<(BrightnessInput, SocketMessageHolder)>,
+    is_fading: Cell<bool>
 }
 
 impl BrightnessState {
@@ -412,7 +413,8 @@ impl BrightnessState {
 
         BrightnessState {
             brightness: NonReadBlockingRWLock::new(initial_brightness, rx),
-            fade_notifier: tx
+            fade_notifier: tx,
+            is_fading: Cell::new(false)
         }
     }
 
