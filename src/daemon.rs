@@ -888,6 +888,8 @@ impl Daemon {
         let mut inputs = VecDeque::<(BrightnessInput, SocketMessageHolder)>::with_capacity(2);
         inputs.push_back( (brightness_change, socket_holder) );
 
+        let mut persistent_guard = None;
+
         'base_loop: loop {
             let head = inputs.pop_front();
 
@@ -929,7 +931,7 @@ impl Daemon {
                     // note that this may not necessarily be a fade
                     // if it is not a fade, then we have nothing to worry about
                     // it will terminate on its own
-                    if let x @ Some(_) = self.brightness.try_lock_brightness() {
+                    if let x @ Some(_) = persistent_guard.or_else(|| self.brightness.try_lock_brightness()) {
                         x
                     }
                     else {
@@ -1049,7 +1051,7 @@ impl Daemon {
 
                 brightness_guard.set(new_brightness);
 
-                drop(brightness_guard);
+                persistent_guard = Some(brightness_guard);
 
                 match self.refresh_brightness().await {
                     Ok(_) => {
