@@ -943,6 +943,12 @@ impl Daemon {
 
                         let _ = send_channel.send( (brightness_change, socket_holder) );
 
+                        // send all the ones that are queued
+                        // theoretically this should always be empty
+                        for input in inputs.into_iter() {
+                            let _ = send_channel.send( (input.0, input.1) );
+                        }
+
                         return;
                     }
                 }
