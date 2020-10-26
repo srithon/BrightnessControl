@@ -999,57 +999,53 @@ impl Daemon {
                     }
                 };
 
-                'outer_fade: loop {
-                    for _ in 0..iterator_num_steps {
-                        let brightness = self.brightness.get() + brightness_step;
+                for _ in 0..iterator_num_steps {
+                    let brightness = self.brightness.get() + brightness_step;
 
-                        brightness_guard.set(brightness);
+                    brightness_guard.set(brightness);
 
-                        let brightness_string = format!("{:.5}", brightness / 100.0);
+                    let brightness_string = format!("{:.5}", brightness / 100.0);
 
-                        let mut command = self.create_xrandr_command_with_brightness(brightness_string).await;
+                    let mut command = self.create_xrandr_command_with_brightness(brightness_string).await;
 
-                        match command.spawn() {
-                            Ok(call_handle) => {
-                                tokio::spawn(call_handle);
-                            },
-                            Err(e) => {
-                                socket_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
+                    match command.spawn() {
+                        Ok(call_handle) => {
+                            tokio::spawn(call_handle);
+                        },
+                        Err(e) => {
+                            socket_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
+                        }
+                    };
+
+                    let mut delay_future = tokio::time::delay_for(fade_step_delay);
+
+                    // this has to be mutable to call recv() on it
+                    let receiver = &mut *brightness_guard.mutex_guard;
+
+                    loop {
+                        select! {
+                            _ = &mut delay_future => break,
+                            Some( (input, other_socket_holder) ) = receiver.recv() => {
+                                let terminate_fade = input.terminate_fade;
+
+                                inputs.push_back( (input, other_socket_holder) );
+
+                                // interrupt current fade by continuing base loop
+                                // if terminate_fade is true
+                                //
+                                // otherwise the queued input will be processed in the next
+                                // iteration of the loop
+                                if terminate_fade {
+                                    socket_holder.consume();
+                                    self.brightness.is_fading.set(false);
+                                    continue 'base_loop;
+                                }
                             }
                         };
+                    };
+                }
 
-                        let mut delay_future = tokio::time::delay_for(fade_step_delay);
-
-                        // this has to be mutable to call recv() on it
-                        let receiver = &mut *brightness_guard.mutex_guard;
-
-                        loop {
-                            select! {
-                                _ = &mut delay_future => break,
-                                Some( (input, other_socket_holder) ) = receiver.recv() => {
-                                    let terminate_fade = input.terminate_fade;
-
-                                    inputs.push_back( (input, other_socket_holder) );
-
-                                    // interrupt current fade by continuing base loop
-                                    // if terminate_fade is true
-                                    //
-                                    // otherwise the queued input will be processed in the next
-                                    // iteration of the loop
-                                    if terminate_fade {
-                                        socket_holder.consume();
-                                        self.brightness.is_fading.set(false);
-                                        continue 'base_loop;
-                                    }
-                                }
-                            };
-                        };
-                    }
-
-                    self.brightness.is_fading.set(false);
-
-                    break 'outer_fade;
-                };
+                self.brightness.is_fading.set(false);
 
                 brightness_guard.set(new_brightness);
 
