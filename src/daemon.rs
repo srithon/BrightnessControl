@@ -561,7 +561,7 @@ struct Daemon {
     // these are primitives, so it doesn't matter
     brightness: BrightnessState,
     mode: NonReadBlockingRWLock<bool, ()>,
-    displays: RwLock<Vec<String>>,
+    displays: RwLock<Vec<Monitor>>,
     config: RwLock<DaemonOptions>,
     file_utils: FileUtils
 }
