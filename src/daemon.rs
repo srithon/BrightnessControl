@@ -718,10 +718,6 @@ impl Daemon {
         let res = try_join!(
             self.file_utils.write_mode(self.mode.get()),
             self.file_utils.write_brightness(self.brightness.get()),
-            async {
-                let displays = self.displays.read().await;
-                self.file_utils.write_displays(&displays).await
-            }
         );
 
         match res {
@@ -1117,8 +1113,7 @@ impl Daemon {
     }
 
     async fn reconfigure_displays(&self) -> Result<()> {
-        let mut displays_file = self.file_utils.get_displays_file().await?;
-        let new_displays = configure_displays(&mut displays_file).await?;
+        let new_displays = configure_displays().await?;
 
         // immutable update
         // self.displays.clear();
@@ -1257,26 +1252,6 @@ async fn get_current_connected_displays() -> Result<Vec<String>> {
     Ok(connected_displays)
 }
 
-async fn write_specified_displays_to_file(displays_file: &mut File, connected_displays: &Vec<String>) -> Result<()> {
-    // sum the lengths of each display name, and then add (number of names - 1) to account
-    // for newline separators between each name
-    // subtract 1 because there is no newline at the end
-    let displays_file_length = (connected_displays.len() - 1) +
-        connected_displays.iter().map(| display_name | display_name.len()).sum::<usize>();
-
-    // .iter() so that connected_displays is not moved
-    for display in connected_displays.iter() {
-        displays_file.write_all(display.as_bytes()).await?;
-        displays_file.write_all(b"\n").await?;
-    }
-
-    // the above loop appends a newline to each display, including the last one
-    // however, this call to set_len() cuts out this final newline
-    displays_file.set_len(displays_file_length as u64).await?;
-
-    Ok(())
-}
-
 async fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
     // 8 KB
     const INITIAL_BUFFER_SIZE: usize = 8 * 1024;
@@ -1310,10 +1285,8 @@ async fn get_configuration_from_file(configuration_file: &mut File) -> std::resu
     return Ok(config);
 }
 
-async fn configure_displays(displays_file: &mut File) -> Result<Vec<String>> {
+async fn configure_displays() -> Result<Vec<Monitor>> {
     let connected_displays = get_current_connected_displays().await?;
-
-    write_specified_displays_to_file(displays_file, &connected_displays).await?;
 
     Ok(connected_displays)
 }
