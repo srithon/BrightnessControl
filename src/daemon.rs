@@ -65,6 +65,15 @@ lazy_static! {
     };
 }
 
+// encapsulates information from xrandr --current
+struct Monitor {
+    adapter_name: String,
+    width: u32,
+    height: u32,
+    xOffset: u32,
+    yOffset: u32
+}
+
 struct SocketMessageHolder {
     // queue messages into this and then push them all to the socket at the end
     messages: Vec<SocketMessage>,
@@ -246,10 +255,6 @@ impl FileUtils {
         self.open_cache_file("brightness").await
     }
 
-    async fn get_displays_file(&self) -> Result<File> {
-        self.open_cache_file("displays").await
-    }
-
     // 0 for regular
     // 1 for night light
     // gets the mode written to disk; if invalid, writes a default and returns it
@@ -268,22 +273,6 @@ impl FileUtils {
             return Err(Error::new(ErrorKind::InvalidData, "Invalid mode"));
 
         }, false).await
-    }
-
-    // loads displays in `displays` or writes down the real values
-    async fn get_written_displays(&self) -> Result<Vec<String>> {
-        let mut displays_file = self.get_displays_file().await?;
-
-        let buffered_display_file_reader = BufReader::new(&mut displays_file);
-        // filter out all invalid lines and then collect them into a Vec<String>
-        let read_displays = buffered_display_file_reader.lines().filter_map(| line | line.ok()).collect::<Vec<String>>().await;
-
-        if read_displays.len() > 0 {
-            Ok(read_displays)
-        }
-        else {
-            configure_displays(&mut displays_file).await
-        }
     }
 
     async fn get_written_brightness(&self) -> Result<f64> {
@@ -311,12 +300,6 @@ impl FileUtils {
     async fn write_mode(&self, mode: bool) -> Result<()> {
         let mut mode_file = self.get_mode_file().await?;
         overwrite_file_with_content(&mut mode_file, mode).await?;
-        Ok(())
-    }
-
-    async fn write_displays(&self, displays: &Vec<String>) -> Result<()> {
-        let mut displays_file = self.get_displays_file().await?;
-        write_specified_displays_to_file(&mut displays_file, displays).await?;
         Ok(())
     }
 
