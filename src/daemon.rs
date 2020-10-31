@@ -28,6 +28,8 @@ use std::collections::VecDeque;
 
 use std::cmp;
 
+use regex::Regex;
+
 pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
 
 pub const CONFIG_TEMPLATE: &str = include_str!("../config_template.toml");
@@ -42,6 +44,24 @@ lazy_static! {
         let options = bincode::DefaultOptions::default();
         options.with_fixint_encoding();
         options
+    };
+
+    static ref XRANDR_DISPLAY_INFORMATION_REGEX: Regex = {
+        Regex::new(r"(?x) # ignore whitespace
+        # [[:alpha:]] represents ascii letters
+        ^([[:alpha:]]+-[[:digit:]]+) # 0 : the adapter name
+        \ # space
+        connected
+        \ # space
+        .*? # optional other words
+        ([[:digit:]]+) # 1 : width
+        x
+        ([[:digit:]]+) # 2 : height
+        \+
+        ([[:digit:]]+) # 3 : xOffset
+        \+
+        ([[:digit:]]+) # 4 : yOffset
+        ").unwrap()
     };
 }
 
