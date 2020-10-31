@@ -74,6 +74,46 @@ struct Monitor {
     yOffset: u32
 }
 
+impl Monitor {
+    fn new(xrandr_line: &str) -> Option<Monitor> {
+        // eDP-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis) 344mm x 193mm
+        // HDMI-1 connected 1280x1024+1920+28 (normal left inverted right x axis y axis) 338mm x 270mm
+        // <adapter> connected [primary] <width>x<height>+<x offset>+<y offset> (<flags>) <something>mm x <something else>mm
+        let captures = (*XRANDR_DISPLAY_INFORMATION_REGEX).captures(xrandr_line);
+
+        if let Some(captures) = captures {
+            // 0 points to the entire match, so skip
+            let adapter_name = captures.get(1).unwrap().as_str().to_owned();
+
+            let mut parse_int = | num: regex::Match | {
+                num.as_str().parse::<u32>()
+            };
+
+            (|| {
+                let width = parse_int(captures.get(2).unwrap())?;
+                let height = parse_int(captures.get(3).unwrap())?;
+                let xOffset = parse_int(captures.get(4).unwrap())?;
+                let yOffset = parse_int(captures.get(5).unwrap())?;
+
+                std::result::Result::<Option<Monitor>, std::num::ParseIntError>::Ok(
+                    Some(
+                        Monitor {
+                            adapter_name,
+                            width,
+                            height,
+                            xOffset,
+                            yOffset
+                        }
+                    )
+                )
+            })().unwrap_or(None)
+        }
+        else {
+            None
+        }
+    }
+}
+
 struct SocketMessageHolder {
     // queue messages into this and then push them all to the socket at the end
     messages: Vec<SocketMessage>,
