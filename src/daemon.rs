@@ -1104,16 +1104,18 @@ impl Daemon {
 
                     let brightness_string = format!("{:.5}", brightness / 100.0);
 
-                    let mut command = self.create_xrandr_command_with_brightness(brightness_string).await;
+                    let commands = self.create_xrandr_commands_with_brightness(brightness_string).await;
 
-                    match command.spawn() {
-                        Ok(call_handle) => {
-                            tokio::spawn(call_handle);
-                        },
-                        Err(e) => {
-                            socket_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
-                        }
-                    };
+                    for mut command in commands {
+                        match command.spawn() {
+                            Ok(call_handle) => {
+                                tokio::spawn(call_handle);
+                            },
+                            Err(e) => {
+                                socket_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
+                            }
+                        };
+                    }
 
                     let mut delay_future = tokio::time::delay_for(fade_step_delay);
 
