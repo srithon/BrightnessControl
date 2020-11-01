@@ -434,7 +434,7 @@ struct FadeOptions {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct DaemonOptions {
     use_redshift: bool,
-    auto_reconfigure: bool,
+    auto_remove_displays: bool,
     fade_options: FadeOptions,
     nightlight_options: NightlightOptions
 }
@@ -738,9 +738,9 @@ impl Daemon {
     // boolean signals whether the function removed any monitors from self.displays
     async fn refresh_brightness(&self) -> Result<bool> {
         let commands = self.create_xrandr_commands().await;
-        let auto_reconfigure = self.config.read().await.auto_reconfigure;
+        let auto_remove_displays = self.config.read().await.auto_remove_displays;
 
-        if auto_reconfigure {
+        if auto_remove_displays {
             // use UnsafeCell to have 2 separate iterators
             // 1 iterating over futures
             // 1 iterating over indices
@@ -1322,11 +1322,12 @@ async fn get_configuration_from_file(configuration_file: &mut File) -> std::resu
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift, auto_reconfigure, fade_options, nightlight_options);
+    overwrite_values!(use_redshift, auto_remove_displays, fade_options, nightlight_options);
 
     return Ok(config);
 }
 
+// TODO
 async fn configure_displays() -> Result<Vec<Monitor>> {
     let connected_displays = get_current_connected_displays().await?;
 
