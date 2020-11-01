@@ -1,3 +1,7 @@
+# 1.6.0
+* this release is identical to v1.6.0-alpha-1
+  * see Pull Request #34 for the reasoning
+
 # 1.6.0-alpha-1
 * Fixed multi-monitors
   * NOTE: currently cannot modify brightness individually
