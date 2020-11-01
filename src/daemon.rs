@@ -1025,7 +1025,7 @@ impl Daemon {
                     // note that this may not necessarily be a fade
                     // if it is not a fade, then we have nothing to worry about
                     // it will terminate on its own
-                    if let x @ Some(_) = persistent_guard.or_else(|| self.brightness.try_lock_brightness()) {
+                    if let x @ Some(_) = persistent_guard.take().or_else(|| self.brightness.try_lock_brightness()) {
                         x
                     }
                     else {
