@@ -1,3 +1,8 @@
+# 1.6.0-alpha-1
+* Fixed multi-monitors
+  * NOTE: currently cannot modify brightness individually
+    * brightness commands affect ALL displays
+
 # 1.6.0-alpha-0
 * Daemon now processes input asynchronously
   * process multiple inputs at the same time
