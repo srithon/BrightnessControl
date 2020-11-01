@@ -14,6 +14,10 @@ To use `redshift` instead of `xrandr` for the blue light filter, set `use_redshi
 
 Since version `1.4.5`, `BrightnessControl` can smoothly fade between brightness levels. More information on brightness fading can be found in the configuration template.
 
+Since version `1.6.0`, `BrightnessControl` processes input asynchronously, **and multiple monitors function as expected**
+
+**NOTE**: the release that was previously `v1.6.0-alpha-1` has become the official `v1.6.0` release; see [Pull Request #34](https://github.com/srithon/BrightnessControl/pull/34) for reasoning.
+
 ***
 
 Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
@@ -25,6 +29,8 @@ When the daemon is started, it loads the following values from disk
   * stored in `~/.cache/brightnesscontrol/mode`
 * displays: list of connected display adapters
   * stored in `~/.cache/brightnesscontrol/displays`
+
+**NOTE**: multi-monitor displays are not yet functional. Until then, you can manually edit the `displays` cache file while the daemon is not running and remove all but one of the displays. This will be fixed in the `1.6.0` release.
 
 If the contents of either `brightness` or `mode` are invalid, they are automatically defaulted and overwritten
 
@@ -114,7 +120,7 @@ cargo install --path . --root ~/.local/
 ### Configuring Redshift
 *Change redshift's adjustment mode*
 ```
-sed -i 's/adjustment-method=randr/adjustment-method=vidmode' ~/.config/redshift.conf
+sed -i 's/adjustment-method=randr/adjustment-method=vidmode/' ~/.config/redshift.conf
 ```
 
 ## Usage
@@ -146,6 +152,16 @@ $ brightness_control b --set 80
 _To Set the Brightness to 50% Without Fading_
 ```
 $ brightness_control b -ns80
+```
+
+_To Terminate the Current Brightness Fade_
+```
+$ brightness_control b -t
+```
+
+_To Terminate/Interrupt the Current Brightness Fade and Decrement the Brightness by 10%_
+```
+$ brightness_control b -td10
 ```
 
 *To Toggle Night Light*

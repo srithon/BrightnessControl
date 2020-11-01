@@ -24,10 +24,10 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
     };
 
     let property_validator = |arg: String| {
-        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, and [m]ode";
+        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, [m]ode and [i]s_fading";
 
         if arg.len() == 1 {
-            const CHARS: &[char] = &['b', 'c', 'd', 'm'];
+            const CHARS: &[char] = &['b', 'c', 'd', 'm', 'i'];
             let arg_char = arg.chars().nth(0).unwrap();
             let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
 
@@ -39,7 +39,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             }
         }
         else {
-            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode"];
+            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode", "is_fading"];
             let valid = OPTIONS.iter().any(|prop| arg.eq_ignore_ascii_case(prop));
 
             return if !valid {
@@ -53,6 +53,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
 
     clap_app!(BrightnessControl =>
         (@setting VersionlessSubcommands)
+        (@setting ArgsNegateSubcommands)
         (version: crate_version!())
         (author: "Sridaran Thoniyil")
         (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
@@ -66,16 +67,17 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg set: -s --set +takes_value value_name[PERCENTAGE] {percentage_validator} "Sets the current brightness to %")
             )
             (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
-            (@arg force_fade: -f --fade "Overrides the auto-fade functionality and fades regardless of the current configuration")
-            (@arg force_no_fade: -n --("no-fade") "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
+            (@arg force_fade: -f --fade requires[action] "Overrides the auto-fade functionality and fades regardless of the current configuration")
+            (@arg force_no_fade: -n --("no-fade") requires[action] "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
+            (@arg terminate_fade: -t --("terminate-fade") required_unless[action] "Terminates the current fade if one is currently running; this can be combined with one")
         )
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
             (visible_alias: "n")
-            (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@group action =>
                 (@arg toggle_nightlight: -t --toggle "Toggles the nightlight")
             )
+            (@arg quiet: -q --quiet requires[action] "Do not wait for the Daemon's output before terminating")
         )
         (@subcommand config =>
             (about: "Holds commands involving daemon configuration")
@@ -85,14 +87,15 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
-        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', or 'c[onfig]'")
-        (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
+        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', [i]s_fading, or 'c[onfig]'")
+        (@arg configure_display: -c --("configure-display") conflicts_with[get] "Uses the current display configuration for future calls to BrightnessControl")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
             (visible_alias: "d")
             (@group action =>
                 (@arg start: -s --start "Attempts to start the daemon. The process will not be tied to the process that runs it")
             )
+            (@arg no_fork: -n --("no-fork") requires[start] "Does not fork the process when starting the daemon; this generally means that it will be tied to the shell that starts it")
         )
     ).global_setting(AppSettings::ArgRequiredElseHelp)
 }
@@ -106,7 +109,7 @@ fn main() -> Result<()> {
         match matches.subcommand() {
             ("daemon", Some(sub_app)) => {
                 if sub_app.is_present("start") {
-                    daemon::daemon()?;
+                    daemon::daemon(!sub_app.is_present("no_fork"))?;
                 }
             },
             ("config", Some(sub_app)) => {
