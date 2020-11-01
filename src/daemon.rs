@@ -1062,12 +1062,8 @@ impl Daemon {
                 // this returns true if refresh_brightness reconfigured the display automatically
                 // dont want to reconfigure AGAIN
                 match self.refresh_brightness().await {
-                    Ok(skip_configure_display) => {
+                    Ok(_) => {
                         socket_holder.queue_success(format!("Set brightness to {}%", self.brightness.get()));
-
-                        if skip_configure_display {
-                            socket_holder.queue_success("Automatically reconfigured displays!");
-                        }
                     },
                     Err(e) => {
                         socket_holder.queue_error(format!("Failed to refresh brightness: {}", e));
