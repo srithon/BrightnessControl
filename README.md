@@ -27,14 +27,8 @@ When the daemon is started, it loads the following values from disk
   * stored in `~/.cache/brightnesscontrol/brightness`
 * mode: 0 or 1; 0 means nightlight is off, 1 means it is on
   * stored in `~/.cache/brightnesscontrol/mode`
-* displays: list of connected display adapters
-  * stored in `~/.cache/brightnesscontrol/displays`
-
-**NOTE**: multi-monitor displays are not yet functional. Until then, you can manually edit the `displays` cache file while the daemon is not running and remove all but one of the displays. This will be fixed in the `1.6.0` release.
 
 If the contents of either `brightness` or `mode` are invalid, they are automatically defaulted and overwritten
-
-If the `displays` file is empty or non-existent, it will automatically be populated with the current display configuration
 
 After starting, the daemon stores all of these values in memory, and does not touch the files again until it receives a `SIGTERM` signal.
 
