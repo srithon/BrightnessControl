@@ -598,7 +598,7 @@ impl DaemonWrapper {
 
         println!("Brightness: {}", daemon.brightness.get());
         println!("Mode: {}", daemon.mode.get());
-        println!("Displays: {:?}", *daemon.displays.read().await);
+        println!("Displays: {}", daemon.get_formatted_displays_list().await);
 
         try_join!(
             async move {
@@ -712,6 +712,11 @@ impl Daemon {
                 file_utils
             }
         )
+    }
+
+    // returns a string with the adapters separated by spaces
+    async fn get_formatted_displays_list(&self) -> String {
+        self.displays.read().await.iter().map(|monitor| &*monitor.adapter_name).collect::<Vec<&str>>().join(" ")
     }
 
     async fn save_configuration(&self) -> Result<()> {
@@ -845,7 +850,7 @@ impl Daemon {
                     format!("{}", self.brightness.get())
                 },
                 GetProperty::Displays => {
-                    self.displays.read().await.join(" ")
+                    self.get_formatted_displays_list().await
                 },
                 GetProperty::Mode => {
                     format!("{}", self.mode.get() as i32)
