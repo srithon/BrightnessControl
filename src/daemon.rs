@@ -707,7 +707,7 @@ impl Daemon {
             Daemon {
                 brightness: BrightnessState::new(file_utils.get_written_brightness().await?),
                 mode: NonReadBlockingRWLock::new(file_utils.get_written_mode().await?, ()),
-                displays: RwLock::new(file_utils.get_written_displays().await?),
+                displays: RwLock::new(get_current_connected_displays().await?),
                 config: RwLock::new(config),
                 file_utils
             }
