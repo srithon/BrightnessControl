@@ -1390,19 +1390,19 @@ pub fn daemon(fork: bool) -> Result<()> {
 
     let cache_dir = file_utils.project_directory.cache_dir();
 
-    let (stdout, stderr) = {
-        let mut open_options = std::fs::OpenOptions::new();
-        open_options
-            .append(true)
-            .create(true);
-
-        let stdout = open_options.open(cache_dir.join("daemon_stdout.out"))?;
-        let stderr = open_options.open(cache_dir.join("daemon_stderr.err"))?;
-
-        (stdout, stderr)
-    };
-
     if fork {
+        let (stdout, stderr) = {
+            let mut open_options = std::fs::OpenOptions::new();
+            open_options
+                .append(true)
+                .create(true);
+
+            let stdout = open_options.open(cache_dir.join("daemon_stdout.out"))?;
+            let stderr = open_options.open(cache_dir.join("daemon_stderr.err"))?;
+
+            (stdout, stderr)
+        };
+
         let daemonize = Daemonize::new()
             .pid_file(pid_file_path)
             .working_directory(&cache_dir)
