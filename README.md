@@ -14,7 +14,9 @@ To use `redshift` instead of `xrandr` for the blue light filter, set `use_redshi
 
 Since version `1.4.5`, `BrightnessControl` can smoothly fade between brightness levels. More information on brightness fading can be found in the configuration template.
 
-Since version `1.6.0`, `BrightnessControl` processes input asynchronously.
+Since version `1.6.0`, `BrightnessControl` processes input asynchronously, **and multiple monitors function as expected**
+
+**NOTE**: the release that was previously `v1.6.0-alpha-1` has become the official `v1.6.0` release; see [Pull Request #34](https://github.com/srithon/BrightnessControl/pull/34) for reasoning.
 
 ***
 
