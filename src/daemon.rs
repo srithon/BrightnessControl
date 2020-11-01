@@ -30,6 +30,8 @@ use std::cmp;
 
 use regex::Regex;
 
+use futures::stream::FuturesOrdered;
+
 pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
 
 pub const CONFIG_TEMPLATE: &str = include_str!("../config_template.toml");
@@ -733,28 +735,76 @@ impl Daemon {
         }
     }
 
-    // boolean signals whether to skip display reconfiguration in process_input
+    // boolean signals whether the function removed any monitors from self.displays
     async fn refresh_brightness(&self) -> Result<bool> {
-        let call_handle = self.create_xrandr_command().await.spawn()?;
+        let commands = self.create_xrandr_commands().await;
+        let auto_reconfigure = self.config.read().await.auto_reconfigure;
 
-        if self.config.read().await.auto_reconfigure {
-            let exit_status = call_handle.await?;
+        if auto_reconfigure {
+            // use UnsafeCell to have 2 separate iterators
+            // 1 iterating over futures
+            // 1 iterating over indices
+            // futures require a mutable reference to the underlying vector
+            // therefore, the 2 iterators cannot coexist normally
+            let enumerated_futures = {
+                let enumerated_futures = commands.into_iter().enumerate().filter_map(|(index, mut command)| {
+                    if let Ok(call_handle) = command.spawn() {
+                        Some( (index, call_handle) )
+                    }
+                    else {
+                        None
+                    }
+                }).collect::<Vec<( usize, _ )>>();
 
-            // if the call fails, then the configuration is no longer valid
-            // reconfigures the display and then tries again
-            if !exit_status.success() {
-                // force reconfigure
-                self.reconfigure_displays().await?;
-                self.create_xrandr_command().await.spawn()?.await?;
-                return Ok(true);
+                UnsafeCell::new(enumerated_futures)
+            };
+
+            let mut active_monitor_indices_iterator = {
+                let enumerated_futures = unsafe {
+                    enumerated_futures.get().as_mut().unwrap()
+                };
+
+                enumerated_futures.iter().map(| ( index, _ ) | *index).rev()
+            };
+
+            let mut ordered_futures = {
+                let enumerated_futures = unsafe {
+                    enumerated_futures.get().as_mut().unwrap()
+                };
+
+                enumerated_futures.iter_mut().map(| ( _, future ) | future).rev().collect::<FuturesOrdered<_>>()
+            };
+
+            let mut removed_display = false;
+
+            while let Some(exit_status) = ordered_futures.next().await {
+                // guaranteed to work
+                let index = active_monitor_indices_iterator.nth(0).unwrap();
+
+                let exit_status = exit_status?;
+
+                // if the call fails, then the configuration is no longer valid
+                // remove the monitor from "displays"
+                if !exit_status.success() {
+                    // remove index'th display from list
+                    let mut displays_write_guard = self.displays.write().await;
+                    (*displays_write_guard).remove(index);
+
+                    removed_display = true;
+                }
             }
+
+            Ok(removed_display)
         }
         else {
             // wait for it on its own
-            tokio::spawn(call_handle);
-        }
+            for mut command in commands {
+                let call_handle = command.spawn()?;
+                tokio::spawn(call_handle);
+            }
 
-        Ok(false)
+            Ok(false)
+        }
     }
 
     fn clear_redshift(&mut self) -> Result<()> {
