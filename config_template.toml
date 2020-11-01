@@ -1,4 +1,4 @@
-# v1.4.7
+# v1.6.0
 # ^ KEEP THIS IN THE TEMPLATE
 # Every time the template is updated, the current version is put at the top
 # You can delete it in your own config, but this should stay in the template
@@ -16,13 +16,13 @@ use_redshift = false
 # daemon to process each individual client command faster
 # Calls to xrandr will fail if a monitor is disconnected without the display being reconfigured (brightness_control -c)
 # If set to true, the daemon will wait for each xrandr process to terminate
-# before processing the next client command
+# before starting to fade
 # This means that successive xrandr calls will not fail
 #
 # HOWEVER, *connecting* a new display will not make xrandr throw an error
 # When connecting a new display, use `brightness_control -c` to apply settings
 # to that display
-auto_reconfigure = true
+auto_remove_displays = true
 
 [nightlight_options]
 # When use_redshift is set to false, BrightnessControl uses xrandr --gamma to
