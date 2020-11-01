@@ -60,9 +60,9 @@ lazy_static! {
         x
         ([[:digit:]]+) # 2 : height
         \+
-        ([[:digit:]]+) # 3 : xOffset
+        ([[:digit:]]+) # 3 : x_offset
         \+
-        ([[:digit:]]+) # 4 : yOffset
+        ([[:digit:]]+) # 4 : y_offset
         ").unwrap()
     };
 }
@@ -72,8 +72,8 @@ struct Monitor {
     adapter_name: String,
     width: u32,
     height: u32,
-    xOffset: u32,
-    yOffset: u32
+    x_offset: u32,
+    y_offset: u32
 }
 
 impl Monitor {
@@ -94,8 +94,8 @@ impl Monitor {
             (|| {
                 let width = parse_int(captures.get(2).unwrap())?;
                 let height = parse_int(captures.get(3).unwrap())?;
-                let xOffset = parse_int(captures.get(4).unwrap())?;
-                let yOffset = parse_int(captures.get(5).unwrap())?;
+                let x_offset = parse_int(captures.get(4).unwrap())?;
+                let y_offset = parse_int(captures.get(5).unwrap())?;
 
                 std::result::Result::<Option<Monitor>, std::num::ParseIntError>::Ok(
                     Some(
@@ -103,8 +103,8 @@ impl Monitor {
                             adapter_name,
                             width,
                             height,
-                            xOffset,
-                            yOffset
+                            x_offset,
+                            y_offset
                         }
                     )
                 )
