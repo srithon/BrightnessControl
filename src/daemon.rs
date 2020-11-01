@@ -1327,7 +1327,6 @@ async fn get_configuration_from_file(configuration_file: &mut File) -> std::resu
     return Ok(config);
 }
 
-// TODO
 async fn configure_displays() -> Result<Vec<Monitor>> {
     let connected_displays = get_current_connected_displays().await?;
 
