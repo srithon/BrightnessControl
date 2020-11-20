@@ -132,7 +132,7 @@ impl FileUtils {
 
     pub async fn write_mode(&self, mode: bool) -> Result<()> {
         let mut mode_file = self.get_mode_file().await?;
-        overwrite_file_with_content(&mut mode_file, mode).await?;
+        overwrite_file_with_content(&mut mode_file, mode as u8).await?;
         Ok(())
     }
 
