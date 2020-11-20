@@ -1,2 +1,4 @@
-pub mod core;
+mod core;
 pub mod display;
+
+pub use self::core::*;
