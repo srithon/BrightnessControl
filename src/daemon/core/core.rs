@@ -575,7 +575,9 @@ impl Daemon {
 
                 let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
 
-                self.refresh_brightness().await;
+                if let Err(e) = self.refresh_brightness().await {
+                    socket_holder.queue_error(format!("Error refreshing brightness: {}", e));
+                }
 
                 let mut brightness_guard = {
                     if let Some(guard) = optional_guard {

@@ -47,7 +47,7 @@ impl Monitor {
             // 0 points to the entire match, so skip
             let adapter_name = captures.get(1).unwrap().as_str().to_owned();
 
-            let mut parse_int = | num: regex::Match | {
+            let parse_int = | num: regex::Match | {
                 num.as_str().parse::<u32>()
             };
 
