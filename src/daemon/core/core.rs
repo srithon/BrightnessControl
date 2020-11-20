@@ -1,34 +1,25 @@
 use daemonize::Daemonize;
-use bincode::{Options, DefaultOptions};
-use directories::ProjectDirs;
-
-use lazy_static::lazy_static;
-
-use serde::{Serialize, Deserialize};
+use bincode::{Options};
 
 use tokio::{
     prelude::*,
-    io::{ BufReader },
-    fs::{self, File, OpenOptions},
-    net::{ UnixStream, UnixListener },
+    fs,
+    net::UnixListener,
     stream::StreamExt,
     process::{Command},
-    sync::{ RwLock, Mutex, MutexGuard, mpsc },
+    sync::{ RwLock, mpsc },
     runtime::{self, Runtime},
     try_join,
     select
 };
 
 use std::io::{Error, ErrorKind, Write as SyncWrite, Result};
-use std::fmt::Display;
 
-use std::cell::{ Cell, UnsafeCell };
+use std::cell::{ UnsafeCell };
 
 use std::collections::VecDeque;
 
 use std::cmp;
-
-use regex::Regex;
 
 use futures::stream::FuturesOrdered;
 
@@ -37,7 +28,6 @@ use crate::daemon::fs::*;
 use super::{
     display::*,
     super::{
-        fs::*,
         config::{
             runtime::*,
             persistent::*
