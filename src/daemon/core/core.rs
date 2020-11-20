@@ -194,12 +194,17 @@ impl Daemon {
 
         println!("Loaded configuration: {:?}", config);
 
+        let brightness = BrightnessState::new(file_utils.get_written_brightness().await?);
+        let mode = NonReadBlockingRWLock::new(file_utils.get_written_mode().await?, ());
+        let displays = RwLock::new(get_current_connected_displays().await?);
+        let config = RwLock::new(config);
+
         Ok(
             Daemon {
-                brightness: BrightnessState::new(file_utils.get_written_brightness().await?),
-                mode: NonReadBlockingRWLock::new(file_utils.get_written_mode().await?, ()),
-                displays: RwLock::new(get_current_connected_displays().await?),
-                config: RwLock::new(config),
+                brightness,
+                mode,
+                displays,
+                config,
                 file_utils
             }
         )
