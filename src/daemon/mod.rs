@@ -4,5 +4,5 @@ pub mod config;
 pub mod util;
 
 pub fn start_daemon(fork: bool) -> std::io::Result<()> {
-    core::daemon(fork)
+    core::core::daemon(fork)
 }
