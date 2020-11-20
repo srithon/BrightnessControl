@@ -28,7 +28,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
 
         if arg.len() == 1 {
             const CHARS: &[char] = &['b', 'c', 'd', 'm', 'i'];
-            let arg_char = arg.chars().nth(0).unwrap();
+            let arg_char = arg.chars().next().unwrap();
             let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
 
             if !valid {

@@ -61,7 +61,7 @@ fn check_brightness(matches: &ArgMatches) -> Result<BrightnessInput> {
 
 fn check_get_property(matches: &ArgMatches) -> Option<GetProperty> {
     if let Some(get_argument) = matches.value_of("get") {
-        if let Some(mut first_char) = get_argument.chars().nth(0) {
+        if let Some(mut first_char) = get_argument.chars().next() {
             first_char.make_ascii_lowercase();
             return match first_char {
                 'b' => Some(GetProperty::Brightness),

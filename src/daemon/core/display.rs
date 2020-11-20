@@ -82,7 +82,7 @@ pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
     let command_output = xrandr_current.output().await?;
     // the '&' operator dereferences ascii_code so that it can be compared with a regular u8
     // its original type is &u8
-    let output_lines = command_output.stdout.split(| &ascii_code | ascii_code == '\n' as u8);
+    let output_lines = command_output.stdout.split(| &ascii_code | ascii_code == b'\n');
 
     let connected_displays: Vec<Monitor> = output_lines.filter_map(|line| {
         // if valid UTF-8, pass to Monitor

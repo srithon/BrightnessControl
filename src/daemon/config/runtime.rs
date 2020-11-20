@@ -38,11 +38,11 @@ impl BrightnessState {
         self.fade_notifier.clone()
     }
 
-    pub fn try_lock_brightness<'a>(&'a self) -> Option<MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>> {
+    pub fn try_lock_brightness(&self) -> Option<MutexGuardRefWrapper<'_, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>> {
         self.brightness.try_lock_mut()
     }
 
-    pub async fn lock_brightness<'a>(&'a self) -> MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>> {
+    pub async fn lock_brightness(&self) -> MutexGuardRefWrapper<'_, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>> {
         self.brightness.lock_mut().await
     }
 }

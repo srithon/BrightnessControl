@@ -48,7 +48,7 @@ where T: Copy {
         self.internal.set(new_value);
     }
 
-    pub fn try_lock_mut<'a>(&'a self) -> Option<MutexGuardRefWrapper<'a, T, K>> {
+    pub fn try_lock_mut(&self) -> Option<MutexGuardRefWrapper<'_, T, K>> {
         let guard = self.write_mutex.try_lock();
 
         if let Ok(guard) = guard {
@@ -66,7 +66,7 @@ where T: Copy {
         }
     }
 
-    pub async fn lock_mut<'a>(&'a self) -> MutexGuardRefWrapper<'a, T, K> {
+    pub async fn lock_mut(&self) -> MutexGuardRefWrapper<'_, T, K> {
         let guard = self.write_mutex.lock().await;
 
         MutexGuardRefWrapper {

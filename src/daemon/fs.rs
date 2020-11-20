@@ -175,7 +175,7 @@ impl FileUtils {
 
                     let current_version_string = {
                         let beginning_trimmed = &CONFIG_TEMPLATE[NUM_CHARS_TO_IGNORE..];
-                        let newline_index = beginning_trimmed.find("\n").unwrap();
+                        let newline_index = beginning_trimmed.find('\n').unwrap();
                         &beginning_trimmed[..newline_index]
                     };
 
@@ -200,7 +200,7 @@ impl FileUtils {
         .await;
 
         // dont care about the cause
-        if let Err(_) = overwrite_template_result {
+        if overwrite_template_result.is_err() {
             // overwrite
             overwrite_file_with_content(&mut template_file_clone, CONFIG_TEMPLATE).await?;
         }
@@ -213,7 +213,7 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
     let project_directory = ProjectDirs::from("", "Sridaran Thoniyil", "BrightnessControl");
     // did not use if let because it would require the entire function to be indented
 
-    if let None = project_directory {
+    if project_directory.is_none() {
         panic!("Cannot find base directory");
     }
 

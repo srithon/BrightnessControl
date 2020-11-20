@@ -284,7 +284,7 @@ impl Daemon {
 
             while let Some(exit_status) = ordered_futures.next().await {
                 // guaranteed to work
-                let index = active_monitor_indices_iterator.nth(0).unwrap();
+                let index = active_monitor_indices_iterator.next().unwrap();
 
                 let exit_status = exit_status?;
 
@@ -372,6 +372,7 @@ impl Daemon {
             // can't use an async block inside of a regular one because then we would need to move all the
             // captured variables into the block
             // this is ugly but it works
+            #[allow(clippy::never_loop)]
             loop {
                 if self.config.read().await.use_redshift {
                     if let Err(e) = self.refresh_redshift().await {
@@ -379,11 +380,10 @@ impl Daemon {
                         break;
                     }
                 }
-                else {
-                    if let Err(e) = self.refresh_brightness().await {
-                        socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
-                        break;
-                    }
+                // not using redshift, so refresh brightness to activate xrandr nightlight active
+                else if let Err(e) = self.refresh_brightness().await {
+                    socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
+                    break;
                 }
 
                 // could have used format! to make this a one-liner, but this allows the strings to be
@@ -698,12 +698,10 @@ impl Daemon {
             xrandr_call.arg("--brightness")
                 .arg(&brightness_string);
 
-            if !use_redshift
-            {
-                if self.mode.get() {
-                    xrandr_call.arg("--gamma")
-                        .arg(xrandr_gamma);
-                }
+            // not using redshift AND nightlight on
+            if !use_redshift && self.mode.get() {
+                xrandr_call.arg("--gamma")
+                    .arg(xrandr_gamma);
             }
 
             xrandr_call
