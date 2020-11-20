@@ -194,9 +194,20 @@ impl Daemon {
 
         println!("Loaded configuration: {:?}", config);
 
-        let brightness = BrightnessState::new(file_utils.get_written_brightness().await?);
-        let mode = NonReadBlockingRWLock::new(file_utils.get_written_mode().await?, ());
-        let displays = RwLock::new(get_current_connected_displays().await?);
+        let (brightness, mode, displays) = {
+            let (written_brightness, written_mode, connected_displays) = tokio::join!(
+                file_utils.get_written_brightness(),
+                file_utils.get_written_mode(),
+                get_current_connected_displays()
+            );
+
+            (
+                BrightnessState::new(written_brightness?),
+                NonReadBlockingRWLock::new(written_mode?, ()),
+                RwLock::new(connected_displays?)
+            )
+        };
+
         let config = RwLock::new(config);
 
         Ok(
