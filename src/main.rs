@@ -28,10 +28,10 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
 
         if arg.len() == 1 {
             const CHARS: &[char] = &['b', 'c', 'd', 'm', 'i'];
-            let arg_char = arg.chars().nth(0).unwrap();
+            let arg_char = arg.chars().next().unwrap();
             let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
 
-            return if !valid {
+            if !valid {
                 Err(ERROR_MESSAGE.to_owned())
             }
             else {
@@ -42,7 +42,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode", "is_fading"];
             let valid = OPTIONS.iter().any(|prop| arg.eq_ignore_ascii_case(prop));
 
-            return if !valid {
+            if !valid {
                 Err(ERROR_MESSAGE.to_owned())
             }
             else {
@@ -109,12 +109,12 @@ fn main() -> Result<()> {
         match matches.subcommand() {
             ("daemon", Some(sub_app)) => {
                 if sub_app.is_present("start") {
-                    daemon::daemon(!sub_app.is_present("no_fork"))?;
+                    daemon::start_daemon(!sub_app.is_present("no_fork"))?;
                 }
             },
             ("config", Some(sub_app)) => {
                 if sub_app.is_present("print-default") {
-                    println!("{}", daemon::CONFIG_TEMPLATE);
+                    println!("{}", daemon::config::persistent::CONFIG_TEMPLATE);
                 }
                 else {
                     return Ok( sub_app );

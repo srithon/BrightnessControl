@@ -1,3 +1,7 @@
+# 1.6.1
+* refactored codebase
+* fix mode caching between runs
+
 # 1.6.0
 * this release is identical to v1.6.0-alpha-1
   * see Pull Request #34 for the reasoning

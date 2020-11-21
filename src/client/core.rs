@@ -7,7 +7,7 @@ use std::os::unix::net::UnixStream;
 
 use std::io::{BufRead, BufReader};
 
-use crate::daemon::*;
+use crate::shared::*;
 
 fn check_brightness(matches: &ArgMatches) -> Result<BrightnessInput> {
     let brightness = {
@@ -50,18 +50,18 @@ fn check_brightness(matches: &ArgMatches) -> Result<BrightnessInput> {
 
     let terminate_fade = matches.is_present("terminate_fade");
 
-    return Ok(
+    Ok(
         BrightnessInput {
             brightness,
             override_fade,
             terminate_fade
         }
-    );
+    )
 }
 
 fn check_get_property(matches: &ArgMatches) -> Option<GetProperty> {
     if let Some(get_argument) = matches.value_of("get") {
-        if let Some(mut first_char) = get_argument.chars().nth(0) {
+        if let Some(mut first_char) = get_argument.chars().next() {
             first_char.make_ascii_lowercase();
             return match first_char {
                 'b' => Some(GetProperty::Brightness),
@@ -101,7 +101,7 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
         }
     };
 
-    let bincode_options = &crate::daemon::BINCODE_OPTIONS;
+    let bincode_options = &BINCODE_OPTIONS;
     let binary_encoded_input = bincode_options.serialize(&program_input).unwrap();
 
     socket.write_all(&binary_encoded_input)?;
