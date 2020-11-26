@@ -17,6 +17,12 @@ pub struct CachedState {
     pub nightlight: bool
 }
 
+impl CachedState {
+    pub fn validate(&self) -> bool {
+        self.brightness >= 0.0 && self.brightness <= 1.0
+    }
+}
+
 impl Default for CachedState {
     fn default() -> Self {
         CachedState {

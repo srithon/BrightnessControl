@@ -93,7 +93,23 @@ impl FileUtils {
             return Err(e);
         }
 
-        let state = toml::from_slice(&file_contents_buffer[..file_contents_buffer.len()]).unwrap_or_default();
+        let state = {
+            match toml::from_slice::<CachedState>(&file_contents_buffer[..file_contents_buffer.len()]) {
+                Ok(state) => {
+                    // validate values
+                    if !state.validate() {
+                        CachedState::default()
+                    }
+                    else {
+                        state
+                    }
+                },
+                _ => {
+                    eprintln!("Couldn't parse persistent state file!");
+                    CachedState::default()
+                }
+            }
+        };
 
         Ok(state)
     }
