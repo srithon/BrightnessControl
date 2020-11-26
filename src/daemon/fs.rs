@@ -104,7 +104,7 @@ impl FileUtils {
             },
             Err(e) => {
                 eprintln!("Failed to serialize cached state.");
-                return Err(e);
+                return Err(std::io::Error::new(ErrorKind::Other, format!("{}", e)));
             }
         };
 
