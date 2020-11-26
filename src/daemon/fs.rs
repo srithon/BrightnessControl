@@ -72,68 +72,42 @@ impl FileUtils {
             .await
     }
 
-    pub async fn get_mode_file(&self) -> Result<File> {
-        self.open_cache_file("mode").await
+    async fn get_central_cache_file(&self) -> Result<File> {
+        self.open_cache_file("persistent_state.toml").await
     }
 
-    pub async fn get_brightness_file(&self) -> Result<File> {
-        self.open_cache_file("brightness").await
+    async fn get_cached_state(&self) -> Result<CachedState> {
+        let mut cache_file = self.get_central_cache_file().await?;
+
+        const INITIAL_BUFFER_SIZE: usize = 1024;
+
+        let mut file_contents_buffer = Vec::with_capacity(INITIAL_BUFFER_SIZE);
+
+        // fill buffer
+        if let Err(e) = cache_file.read_to_end(&mut file_contents_buffer).await {
+            eprintln!("Failed to read from configuration file! {}", e);
+            return Err(e);
+        }
+
+        let state = toml::from_slice(&file_contents_buffer[..file_contents_buffer.len()]).unwrap_or_default();
+
+        Ok(state)
     }
 
-    // 0 for regular
-    // 1 for night light
-    // gets the mode written to disk; if invalid, writes a default and returns it
-    pub async fn get_written_mode(&self) -> Result<bool> {
-        let mut mode_file = self.get_mode_file().await?;
-        mode_file.set_len(1).await?;
+    async fn write_cached_state(&self, cached_state: &CachedState) -> Result<()> {
+        let mut cache_file = self.get_central_cache_file().await?; 
 
-        get_valid_data_or_write_default(
-            &mut mode_file,
-            &|data_in_file: &String| {
-                if let Ok(num) = data_in_file.parse::<u8>() {
-                    if num == 0 || num == 1 {
-                        // cannot cast "num as bool" normally
-                        return Ok(num != 0);
-                    }
-                }
-
-                Err(Error::new(ErrorKind::InvalidData, "Invalid mode"))
+        match toml::ser::to_vec(cached_state) {
+            Ok(serialized_toml) => {
+                // write state to file
+                cache_file.write_all(&serialized_toml).await?
             },
-            false,
-        )
-        .await
-    }
+            Err(e) => {
+                eprintln!("Failed to serialize cached state.");
+                return Err(e);
+            }
+        };
 
-    pub async fn get_written_brightness(&self) -> Result<f64> {
-        let mut brightness_file = self.get_brightness_file().await?;
-
-        get_valid_data_or_write_default(
-            &mut brightness_file,
-            &|data_in_file: &String| {
-                // need to trim this because the newline character breaks the parse
-                if let Ok(num) = data_in_file.trim_end().parse::<f64>() {
-                    // check bounds; don't allow 0.0 brightness
-                    if num <= 100.0 && num > 0.0 {
-                        return Ok(num);
-                    }
-                }
-
-                Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"))
-            },
-            100.0,
-        )
-        .await
-    }
-
-    pub async fn write_brightness(&self, brightness: f64) -> Result<()> {
-        let mut brightness_file = self.get_brightness_file().await?;
-        overwrite_file_with_content(&mut brightness_file, brightness).await?;
-        Ok(())
-    }
-
-    pub async fn write_mode(&self, mode: bool) -> Result<()> {
-        let mut mode_file = self.get_mode_file().await?;
-        overwrite_file_with_content(&mut mode_file, mode as u8).await?;
         Ok(())
     }
 
