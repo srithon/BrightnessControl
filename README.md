@@ -21,12 +21,11 @@ Since version `1.6.0`, `BrightnessControl` processes input asynchronously, **and
 Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
 
 When the daemon is started, it loads the following values from disk
-* brightness: [0..100] percentage of full brightness
-  * stored in `~/.cache/brightnesscontrol/brightness`
-* mode: 0 or 1; 0 means nightlight is off, 1 means it is on
-  * stored in `~/.cache/brightnesscontrol/mode`
+* stored in `~/.cache/brightnesscontrol/persistent_state.toml`
+  * brightness: [0..100] percentage of full brightness
+  * nightlight: `true` or `false`; `false` means nightlight is off, `true` means it is on
 
-If the contents of either `brightness` or `mode` are invalid, they are automatically defaulted and overwritten
+If the values cannot be parsed correctly, the daemon will instead use the default values.
 
 After starting, the daemon stores all of these values in memory, and does not touch the files again until it receives a `SIGTERM` signal.
 
