@@ -76,7 +76,7 @@ impl FileUtils {
         self.open_cache_file("persistent_state.toml").await
     }
 
-    async fn get_cached_state(&self) -> Result<CachedState> {
+    pub async fn get_cached_state(&self) -> Result<CachedState> {
         let mut cache_file = self.get_central_cache_file().await?;
 
         const INITIAL_BUFFER_SIZE: usize = 1024;
@@ -94,7 +94,7 @@ impl FileUtils {
         Ok(state)
     }
 
-    async fn write_cached_state(&self, cached_state: &CachedState) -> Result<()> {
+    pub async fn write_cached_state(&self, cached_state: &CachedState) -> Result<()> {
         let mut cache_file = self.get_central_cache_file().await?; 
 
         match toml::ser::to_vec(cached_state) {
