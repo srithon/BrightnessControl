@@ -12,7 +12,8 @@ use std::path::Path;
 use std::fmt::Display;
 
 use super::config::{
-    persistent::{CONFIG_TEMPLATE, DaemonOptions}
+    persistent::{CONFIG_TEMPLATE, DaemonOptions},
+    runtime::CachedState
 };
 
 pub type ConfigAttempt =  std::result::Result::<DaemonOptions, toml::de::Error>;
@@ -40,8 +41,12 @@ impl FileUtils {
         })
     }
 
-    pub fn get_cache_dir(&self) -> &Path {
+    fn get_cache_dir(&self) -> &Path {
         self.project_directory.cache_dir()
+    }
+
+    pub fn get_daemon_pid_file(&self) -> std::path::PathBuf {
+        self.get_cache_dir().join("daemon.pid")
     }
 
     // returns the file and whether or not it existed prior to opening it
@@ -57,7 +62,7 @@ impl FileUtils {
         Ok((self.file_open_options.open(filepath).await?, file_exists))
     }
 
-    pub async fn open_cache_file_with_options(
+    async fn open_cache_file_with_options(
         &self,
         file_name: &str,
         open_options: &OpenOptions,
@@ -66,73 +71,63 @@ impl FileUtils {
         open_options.open(filepath).await
     }
 
-    pub async fn open_cache_file(&self, file_name: &str) -> Result<File> {
+    async fn open_cache_file(&self, file_name: &str) -> Result<File> {
         self.open_cache_file_with_options(file_name, &self.file_open_options)
             .await
     }
 
-    pub async fn get_mode_file(&self) -> Result<File> {
-        self.open_cache_file("mode").await
+    async fn get_central_cache_file(&self) -> Result<File> {
+        self.open_cache_file("persistent_state.toml").await
     }
 
-    pub async fn get_brightness_file(&self) -> Result<File> {
-        self.open_cache_file("brightness").await
-    }
+    pub async fn get_cached_state(&self) -> Result<CachedState> {
+        let mut cache_file = self.get_central_cache_file().await?;
 
-    // 0 for regular
-    // 1 for night light
-    // gets the mode written to disk; if invalid, writes a default and returns it
-    pub async fn get_written_mode(&self) -> Result<bool> {
-        let mut mode_file = self.get_mode_file().await?;
-        mode_file.set_len(1).await?;
+        const INITIAL_BUFFER_SIZE: usize = 1024;
 
-        get_valid_data_or_write_default(
-            &mut mode_file,
-            &|data_in_file: &String| {
-                if let Ok(num) = data_in_file.parse::<u8>() {
-                    if num == 0 || num == 1 {
-                        // cannot cast "num as bool" normally
-                        return Ok(num != 0);
+        let mut file_contents_buffer = Vec::with_capacity(INITIAL_BUFFER_SIZE);
+
+        // fill buffer
+        if let Err(e) = cache_file.read_to_end(&mut file_contents_buffer).await {
+            eprintln!("Failed to read from configuration file! {}", e);
+            return Err(e);
+        }
+
+        let state = {
+            match toml::from_slice::<CachedState>(&file_contents_buffer[..file_contents_buffer.len()]) {
+                Ok(state) => {
+                    // validate values
+                    if !state.validate() {
+                        CachedState::default()
                     }
-                }
-
-                Err(Error::new(ErrorKind::InvalidData, "Invalid mode"))
-            },
-            false,
-        )
-        .await
-    }
-
-    pub async fn get_written_brightness(&self) -> Result<f64> {
-        let mut brightness_file = self.get_brightness_file().await?;
-
-        get_valid_data_or_write_default(
-            &mut brightness_file,
-            &|data_in_file: &String| {
-                // need to trim this because the newline character breaks the parse
-                if let Ok(num) = data_in_file.trim_end().parse::<f64>() {
-                    // check bounds; don't allow 0.0 brightness
-                    if num <= 100.0 && num > 0.0 {
-                        return Ok(num);
+                    else {
+                        state
                     }
+                },
+                _ => {
+                    eprintln!("Couldn't parse persistent state file!");
+                    CachedState::default()
                 }
+            }
+        };
 
-                Err(Error::new(ErrorKind::InvalidData, "Invalid brightness"))
+        Ok(state)
+    }
+
+    pub async fn write_cached_state(&self, cached_state: &CachedState) -> Result<()> {
+        let mut cache_file = self.get_central_cache_file().await?; 
+
+        match toml::ser::to_vec(cached_state) {
+            Ok(serialized_toml) => {
+                // write state to file
+                cache_file.write_all(&serialized_toml).await?
             },
-            100.0,
-        )
-        .await
-    }
+            Err(e) => {
+                eprintln!("Failed to serialize cached state.");
+                return Err(std::io::Error::new(ErrorKind::Other, format!("{}", e)));
+            }
+        };
 
-    pub async fn write_brightness(&self, brightness: f64) -> Result<()> {
-        let mut brightness_file = self.get_brightness_file().await?;
-        overwrite_file_with_content(&mut brightness_file, brightness).await?;
-        Ok(())
-    }
-
-    pub async fn write_mode(&self, mode: bool) -> Result<()> {
-        let mut mode_file = self.get_mode_file().await?;
-        overwrite_file_with_content(&mut mode_file, mode as u8).await?;
         Ok(())
     }
 
@@ -226,37 +221,6 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
     }
 
     Ok(project_directory)
-}
-
-// where ....
-async fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
-where T: Display {
-    let mut file_clone = file.try_clone().await?;
-
-    let file_contents = {
-        // wrapping in a closure allows the inner else and the
-        // outer else clauses to share the same code
-        // here, we want to return None if the file does not exist
-        // or if the file's contents are not readable as a number
-        (|| async move {
-            let mut buffer: Vec<u8> = Vec::new();
-            file.read_to_end(&mut buffer).await?;
-
-            let string = unsafe {
-                String::from_utf8_unchecked(buffer)
-            };
-
-            data_validator(&string)
-        })()
-    }.await;
-
-    if let Ok(contents) = file_contents {
-        Ok(contents)
-    }
-    else {
-        overwrite_file_with_content(&mut file_clone, &default_value).await?;
-        Ok(default_value)
-    }
 }
 
 pub async fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {

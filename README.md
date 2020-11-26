@@ -16,19 +16,16 @@ Since version `1.4.5`, `BrightnessControl` can smoothly fade between brightness 
 
 Since version `1.6.0`, `BrightnessControl` processes input asynchronously, **and multiple monitors function as expected**
 
-**NOTE**: the release that was previously `v1.6.0-alpha-1` has become the official `v1.6.0` release; see [Pull Request #34](https://github.com/srithon/BrightnessControl/pull/34) for reasoning.
-
 ***
 
 Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
 
 When the daemon is started, it loads the following values from disk
-* brightness: [0..100] percentage of full brightness
-  * stored in `~/.cache/brightnesscontrol/brightness`
-* mode: 0 or 1; 0 means nightlight is off, 1 means it is on
-  * stored in `~/.cache/brightnesscontrol/mode`
+* stored in `~/.cache/brightnesscontrol/persistent_state.toml`
+  * brightness: [0..100] percentage of full brightness
+  * nightlight: `true` or `false`; `false` means nightlight is off, `true` means it is on
 
-If the contents of either `brightness` or `mode` are invalid, they are automatically defaulted and overwritten
+If the values cannot be parsed correctly, the daemon will instead use the default values.
 
 After starting, the daemon stores all of these values in memory, and does not touch the files again until it receives a `SIGTERM` signal.
 
@@ -38,21 +35,21 @@ Manually modifying these files while the daemon is running will have no effect.
 
 ***
 
-If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically reconfigure its list of displays **IF** `auto-reconfigure` is set to `true` in the configuration file.
+If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically remove the corresponding display from the list **IF** `auto_remove_displays` is set to `true` in the configuration file.
 
 When this is not enabled, each individual client message takes less time to process because the daemon does not have to wait for each `xrandr` call to terminate before moving onto the next one
 
-The `xrandr` call will only fail if a display is *disconnected*, so even with `auto-reconfigure` enabled, the daemon will not automatically reconfigure when a new monitor is connected.
+If your display configuration is mostly static, consider disabling this option.
 
 For users that often disconnect and reconnect monitors, two external options are the [autorandr](https://github.com/phillipberndt/autorandr) and [srandrd](https://github.com/jceb/srandrd) programs.
 
 Both programs can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
 
-This is a good alternative to `auto-reconfigure`, which also has the advantage of working when a new monitor is connected
+This is a good alternative to `auto_remove_displays`, which also has the advantage of working when a _new_ monitor is connected
 
 Instructions on how to configure these programs to work with this application will be added in the future.
 
-Instructions on how to enable/disable `auto-reconfigure` are in the Installation section
+Instructions on how to enable/disable `auto_remove_displays` are in the Installation section
 
 ## Build Dependencies
 **NOTE**: since `v1.4.1`, you can download pre-compiled binaries from [GitHub releases](https://github.com/srithon/BrightnessControl/releases). These binaries are packaged by Travis CI. If you do not want to download `Rust` (admittedly a pretty big dependency), you should consider downloading and using these binaries.
