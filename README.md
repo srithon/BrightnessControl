@@ -35,21 +35,21 @@ Manually modifying these files while the daemon is running will have no effect.
 
 ***
 
-If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically reconfigure its list of displays **IF** `auto-reconfigure` is set to `true` in the configuration file.
+If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically remove the corresponding display from the list **IF** `auto_remove_displays` is set to `true` in the configuration file.
 
 When this is not enabled, each individual client message takes less time to process because the daemon does not have to wait for each `xrandr` call to terminate before moving onto the next one
 
-The `xrandr` call will only fail if a display is *disconnected*, so even with `auto-reconfigure` enabled, the daemon will not automatically reconfigure when a new monitor is connected.
+If your display configuration is mostly static, consider disabling this option.
 
 For users that often disconnect and reconnect monitors, two external options are the [autorandr](https://github.com/phillipberndt/autorandr) and [srandrd](https://github.com/jceb/srandrd) programs.
 
 Both programs can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
 
-This is a good alternative to `auto-reconfigure`, which also has the advantage of working when a new monitor is connected
+This is a good alternative to `auto_remove_displays`, which also has the advantage of working when a _new_ monitor is connected
 
 Instructions on how to configure these programs to work with this application will be added in the future.
 
-Instructions on how to enable/disable `auto-reconfigure` are in the Installation section
+Instructions on how to enable/disable `auto_remove_displays` are in the Installation section
 
 ## Build Dependencies
 **NOTE**: since `v1.4.1`, you can download pre-compiled binaries from [GitHub releases](https://github.com/srithon/BrightnessControl/releases). These binaries are packaged by Travis CI. If you do not want to download `Rust` (admittedly a pretty big dependency), you should consider downloading and using these binaries.
