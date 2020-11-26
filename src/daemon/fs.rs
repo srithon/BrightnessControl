@@ -40,7 +40,7 @@ impl FileUtils {
         })
     }
 
-    pub fn get_cache_dir(&self) -> &Path {
+    fn get_cache_dir(&self) -> &Path {
         self.project_directory.cache_dir()
     }
 
@@ -57,7 +57,7 @@ impl FileUtils {
         Ok((self.file_open_options.open(filepath).await?, file_exists))
     }
 
-    pub async fn open_cache_file_with_options(
+    async fn open_cache_file_with_options(
         &self,
         file_name: &str,
         open_options: &OpenOptions,
@@ -66,7 +66,7 @@ impl FileUtils {
         open_options.open(filepath).await
     }
 
-    pub async fn open_cache_file(&self, file_name: &str) -> Result<File> {
+    async fn open_cache_file(&self, file_name: &str) -> Result<File> {
         self.open_cache_file_with_options(file_name, &self.file_open_options)
             .await
     }
