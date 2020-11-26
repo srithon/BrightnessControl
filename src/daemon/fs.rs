@@ -12,7 +12,8 @@ use std::path::Path;
 use std::fmt::Display;
 
 use super::config::{
-    persistent::{CONFIG_TEMPLATE, DaemonOptions}
+    persistent::{CONFIG_TEMPLATE, DaemonOptions},
+    runtime::CachedState
 };
 
 pub type ConfigAttempt =  std::result::Result::<DaemonOptions, toml::de::Error>;
