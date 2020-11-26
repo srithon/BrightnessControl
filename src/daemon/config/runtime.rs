@@ -7,7 +7,24 @@ use super::super::super::shared::*;
 
 use tokio::sync::mpsc;
 
+use serde::{Serialize, Deserialize};
+
 use std::cell::Cell;
+
+#[derive(Serialize, Deserialize)]
+pub struct CachedState {
+    pub brightness: f64,
+    pub nightlight: bool
+}
+
+impl Default for CachedState {
+    fn default() -> Self {
+        CachedState {
+            brightness: 1.0,
+            nightlight: false
+        }
+    }
+}
 
 pub struct BrightnessState {
     // receiver end of channel in mutex
