@@ -16,8 +16,6 @@ Since version `1.4.5`, `BrightnessControl` can smoothly fade between brightness 
 
 Since version `1.6.0`, `BrightnessControl` processes input asynchronously, **and multiple monitors function as expected**
 
-**NOTE**: the release that was previously `v1.6.0-alpha-1` has become the official `v1.6.0` release; see [Pull Request #34](https://github.com/srithon/BrightnessControl/pull/34) for reasoning.
-
 ***
 
 Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
