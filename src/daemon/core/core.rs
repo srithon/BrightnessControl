@@ -195,16 +195,15 @@ impl Daemon {
         println!("Loaded configuration: {:?}", config);
 
         let (brightness, mode, displays) = {
-            let (written_brightness, written_mode, connected_displays) = tokio::join!(
-                file_utils.get_written_brightness(),
-                file_utils.get_written_mode(),
+            let (cached_state, connected_displays) = tokio::try_join!(
+                file_utils.get_cached_state(),
                 get_current_connected_displays()
-            );
+            )?;
 
             (
-                BrightnessState::new(written_brightness?),
-                NonReadBlockingRWLock::new(written_mode?, ()),
-                RwLock::new(connected_displays?)
+                BrightnessState::new(cached_state.brightness),
+                NonReadBlockingRWLock::new(cached_state.nightlight, ()),
+                RwLock::new(connected_displays)
             )
         };
 
@@ -227,9 +226,13 @@ impl Daemon {
     }
 
     async fn save_configuration(&self) -> Result<()> {
+        let cached_state = CachedState {
+            brightness: self.brightness.get(),
+            nightlight: self.mode.get()
+        };
+
         let res = try_join!(
-            self.file_utils.write_mode(self.mode.get()),
-            self.file_utils.write_brightness(self.brightness.get()),
+            self.file_utils.write_cached_state(&cached_state)
         );
 
         match res {
@@ -767,7 +770,7 @@ fn register_sigterm_handler() -> Result<()> {
 pub fn daemon(fork: bool) -> Result<()> {
     let file_utils = FileUtils::new()?;
 
-    let pid_file_path = file_utils.get_cache_dir().join("daemon.pid");
+    let pid_file_path = file_utils.get_daemon_pid_file();
 
     let cache_dir = file_utils.project_directory.cache_dir();
 
