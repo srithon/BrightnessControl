@@ -45,6 +45,10 @@ impl FileUtils {
         self.project_directory.cache_dir()
     }
 
+    pub fn get_daemon_pid_file(&self) -> std::path::PathBuf {
+        self.get_cache_dir().join("daemon.pid")
+    }
+
     // returns the file and whether or not it existed prior to opening it
     pub async fn open_configuration_file(&self) -> Result<(File, bool)> {
         let config_dir = self.project_directory.config_dir();
