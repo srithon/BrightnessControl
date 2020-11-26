@@ -1,3 +1,8 @@
+# 1.6.2
+* implemented one central cache file instead of one per property
+* fix README
+  * was not yet updated for v1.6.0
+
 # 1.6.1
 * refactored codebase
 * fix mode caching between runs
