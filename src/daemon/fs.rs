@@ -207,37 +207,6 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
     Ok(project_directory)
 }
 
-// where ....
-async fn get_valid_data_or_write_default<T>(file: &mut File, data_validator: &dyn Fn(&String) -> Result<T>, default_value: T) -> Result<T>
-where T: Display {
-    let mut file_clone = file.try_clone().await?;
-
-    let file_contents = {
-        // wrapping in a closure allows the inner else and the
-        // outer else clauses to share the same code
-        // here, we want to return None if the file does not exist
-        // or if the file's contents are not readable as a number
-        (|| async move {
-            let mut buffer: Vec<u8> = Vec::new();
-            file.read_to_end(&mut buffer).await?;
-
-            let string = unsafe {
-                String::from_utf8_unchecked(buffer)
-            };
-
-            data_validator(&string)
-        })()
-    }.await;
-
-    if let Ok(contents) = file_contents {
-        Ok(contents)
-    }
-    else {
-        overwrite_file_with_content(&mut file_clone, &default_value).await?;
-        Ok(default_value)
-    }
-}
-
 pub async fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
     // 8 KB
     const INITIAL_BUFFER_SIZE: usize = 8 * 1024;
