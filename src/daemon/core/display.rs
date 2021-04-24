@@ -104,6 +104,14 @@ impl Monitor {
             None
         }
     }
+
+    pub fn name(&self) -> &String {
+        &self.adapter_name
+    }
+
+    fn update_metadata(&mut self, new_metadata: Option<MonitorMetadata>) {
+        self.monitor_metadata = new_metadata;
+    }
 }
 
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
