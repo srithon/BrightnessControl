@@ -396,6 +396,16 @@ impl CollectiveMonitorState {
         }
     }
 
+    pub async fn get_formatted_displays_list(&self) -> String {
+        // exclusive read
+        let guard = self.monitor_states.read().await;
+        guard
+            .iter_enabled_monitor_states()
+            .map(|monitor| &*monitor.monitor_data.adapter_name)
+            .collect::<Vec<&str>>()
+            .join(" ")
+    }
+
     pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, CollectiveMonitorStateInternal> {
         self.monitor_states.read().await
     }
