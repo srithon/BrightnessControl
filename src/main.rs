@@ -66,10 +66,22 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg decrement: -d --decrement +takes_value value_name[PERCENTAGE] {percentage_validator} "Decrements the current brightness by %")
                 (@arg set: -s --set +takes_value value_name[PERCENTAGE] {percentage_validator} "Sets the current brightness to %")
             )
+            (@group monitor_override =>
+                (@arg monitor: -m --monitor +takes_value value_name[ADAPTER_NAME] "Apply brightness changes to a specific display")
+                (@arg active: --active "Apply brightness changes to the \"active\" monitor; note that this is \"active\" monitor is specific to BrightnessControl and has nothing to do with mouse location or keyboard focus")
+                (@arg all: -a --all "Apply brightness changes to ALL connected monitors")
+            )
             (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@arg force_fade: -f --fade requires[action] "Overrides the auto-fade functionality and fades regardless of the current configuration")
             (@arg force_no_fade: -n --("no-fade") requires[action] "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
             (@arg terminate_fade: -t --("terminate-fade") required_unless[action] "Terminates the current fade if one is currently running; this can be combined with one one of the brightness changing actions")
+        )
+        (@subcommand monitors =>
+            (about: "Holds commands that control BrightnessControl behavior for multiple monitors")
+            (visible_alias: "m")
+            (@group action =>
+                (@arg set_active: -s --("set-active") +takes_value value_name[monitor_adapter_name] "Sets the active monitor for use with \"brightness --active\"; use \"--get displays\" to see options")
+            )
         )
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
@@ -87,7 +99,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
-        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness]', 'm[ode]', 'd[isplays]', [i]s_fading, or 'c[onfig]'")
+        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness] ([adapter name] | [active]) ', 'm[ode]', 'd[isplays]', [i]s_fading, [a]ctive_display or 'c[onfig]'")
         (@arg configure_display: -c --("configure-display") conflicts_with[get] "Uses the current display configuration for future calls to BrightnessControl")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
