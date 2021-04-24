@@ -14,6 +14,7 @@ use serde::{Serialize, Deserialize};
 use std::cell::Cell;
 
 pub type BrightnessGuard<'a> = MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>;
+
 #[derive(Serialize, Deserialize)]
 pub struct CachedState {
     pub brightness_states: FnvHashMap<String, f64>,
@@ -98,8 +99,8 @@ impl ForwardedBrightnessInput {
 
 pub struct BrightnessState {
     // receiver end of channel in mutex
-    pub brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>,
-    pub fade_notifier: mpsc::UnboundedSender<(BrightnessInput, SocketMessageHolder)>,
+    pub brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>,
+    pub fade_notifier: mpsc::UnboundedSender<ForwardedBrightnessInput>,
     pub is_fading: Cell<bool>
 }
 
@@ -108,7 +109,7 @@ unsafe impl Sync for BrightnessState {}
 
 impl BrightnessState {
     pub fn new(initial_brightness: f64) -> BrightnessState {
-        let (tx, rx) = mpsc::unbounded_channel::<(BrightnessInput, SocketMessageHolder)>();
+        let (tx, rx) = mpsc::unbounded_channel::<ForwardedBrightnessInput>();
 
         BrightnessState {
             brightness: NonReadBlockingRWLock::new(initial_brightness, rx),
@@ -121,15 +122,15 @@ impl BrightnessState {
         self.brightness.get()
     }
 
-    pub fn get_fade_notifier(&self) -> mpsc::UnboundedSender<(BrightnessInput, SocketMessageHolder)> {
+    pub fn get_fade_notifier(&self) -> mpsc::UnboundedSender<ForwardedBrightnessInput> {
         self.fade_notifier.clone()
     }
 
-    pub fn try_lock_brightness(&self) -> Option<MutexGuardRefWrapper<'_, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>> {
+    pub fn try_lock_brightness(&self) -> Option<BrightnessGuard> {
         self.brightness.try_lock_mut()
     }
 
-    pub async fn lock_brightness(&self) -> MutexGuardRefWrapper<'_, f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>> {
+    pub async fn lock_brightness<'a>(&'a self) -> BrightnessGuard<'a> {
         self.brightness.lock_mut().await
     }
 }
