@@ -197,11 +197,11 @@ impl CollectiveMonitorStateInternal {
         (0..self.available_adapter_list.len()).into_iter()
     }
 
-    pub fn iter_active_monitor_indices(&self) -> impl Iterator<Item=usize> + '_ {
+    pub fn iter_enabled_monitor_indices(&self) -> impl Iterator<Item=usize> + '_ {
         self.enabled_monitors.iter().map(|&x| x)
     }
 
-    pub fn iter_active_monitor_states(&self) -> impl Iterator<Item=&MonitorState> + '_ {
+    pub fn iter_enabled_monitor_states(&self) -> impl Iterator<Item=&MonitorState> + '_ {
         // TODO filter map?
         // ensure that the unwrap is guaranteed
         self.enabled_monitors.iter().map(move |&x| self.available_adapter_list.get(x).unwrap())
