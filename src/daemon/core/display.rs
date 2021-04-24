@@ -415,7 +415,8 @@ impl CollectiveMonitorState {
     }
 }
 
-pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
+/// Parses `xrandr --current` output and returns a list of (Monitor, is_monitor_connected: bool)
+pub async fn get_available_displays() -> Result<Vec<(Monitor, bool)>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
     let command_output = xrandr_current.output().await?;
@@ -423,7 +424,7 @@ pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
     // its original type is &u8
     let output_lines = command_output.stdout.split(| &ascii_code | ascii_code == b'\n');
 
-    let connected_displays: Vec<Monitor> = output_lines.filter_map(|line| {
+    let displays: Vec<(Monitor, bool)> = output_lines.filter_map(|line| {
         // if valid UTF-8, pass to Monitor
         if let Ok(line) = std::str::from_utf8(line) {
             Monitor::new(line)
@@ -433,11 +434,5 @@ pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
         }
     }).collect();
 
-    Ok(connected_displays)
-}
-
-pub async fn configure_displays() -> Result<Vec<Monitor>> {
-    let connected_displays = get_current_connected_displays().await?;
-
-    Ok(connected_displays)
+    Ok(displays)
 }
