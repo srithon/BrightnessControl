@@ -308,6 +308,75 @@ impl CollectiveMonitorStateInternal {
         // would simply assert the return value of this call
         self.enabled_monitors.remove(monitor_index);
     }
+
+    // TODO clean this up
+    // this should really be an internal function
+    // reasoning:
+    // cant return the iterator itself with static dispatch
+    // because in order to use static dispatch (impl Iterator), there cannot be a branch in the
+    // return
+    // to work around this, we do the mapping within the function itself and then return the
+    // normalized result: a vector
+    // generalized map to for_each
+    pub fn for_each_monitor_override_iterator(&self, monitors: &MonitorOverride, closure: &mut impl FnMut(usize)) {
+        match monitors {
+            MonitorOverride::All => {
+                let iterator = self.iter_enabled_monitor_indices();
+                iterator.for_each(closure)
+            },
+            x => {
+                let index = match x {
+                    MonitorOverride::Specified { ref adapter_name } => {
+                        // TODO remove this copy
+                        // either do it in-place (mutably) or sanitize the input beforehand by
+                        // making it lowercase
+                        self.get_monitor_index_by_name(&adapter_name.to_ascii_lowercase())
+                    },
+                    MonitorOverride::Active => {
+                        Some(self.get_active_monitor_index())
+                    },
+                    _ => unreachable!("Already took care of All case!")
+                };
+
+                let index_vector = match index {
+                    Some(&index) => {
+                        closure(index)
+                    },
+                    None => ()
+                };
+            }
+        }
+    }
+
+    pub fn get_monitor_override_indices(&self, monitors: &MonitorOverride) -> Vec<usize> {
+        match monitors {
+            MonitorOverride::All => {
+                let iterator = self.iter_enabled_monitor_indices();
+                iterator.collect()
+            },
+            x => {
+                let index = match x {
+                    MonitorOverride::Specified { ref adapter_name } => {
+                        // TODO remove this copy
+                        // either do it in-place (mutably) or sanitize the input beforehand by
+                        // making it lowercase
+                        self.get_monitor_index_by_name(&adapter_name.to_ascii_lowercase())
+                    },
+                    MonitorOverride::Active => {
+                        Some(self.get_active_monitor_index())
+                    },
+                    _ => unreachable!("Already took care of All case!")
+                };
+
+                match index {
+                    Some(&index) => {
+                        vec![index]
+                    },
+                    None => vec![]
+                }
+            }
+        }
+    }
 }
 
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
