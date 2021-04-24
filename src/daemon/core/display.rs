@@ -114,6 +114,21 @@ impl Monitor {
     }
 }
 
+pub struct MonitorState {
+    pub monitor_data: Monitor,
+    pub brightness_state: BrightnessState
+}
+
+impl MonitorState {
+    pub fn get_monitor_name(&self) -> &String {
+        self.monitor_data.name()
+    }
+
+    pub fn get_brightness_state(&self) -> &BrightnessState {
+        &self.brightness_state
+    }
+}
+
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
