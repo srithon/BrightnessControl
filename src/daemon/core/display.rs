@@ -396,7 +396,7 @@ impl CollectiveMonitorState {
         }
     }
 
-    pub async fn get_formatted_displays_list(&self) -> String {
+    pub async fn get_formatted_display_names(&self) -> String {
         // exclusive read
         let guard = self.monitor_states.read().await;
         guard
