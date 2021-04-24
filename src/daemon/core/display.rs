@@ -2,10 +2,16 @@ use std::io::Result;
 
 use tokio::process::Command;
 
+use std::collections::BTreeSet;
+
 use lazy_static::lazy_static;
 
 use regex::Regex;
 
+use fnv::FnvHashMap;
+
+use crate::daemon::config::runtime::BrightnessState;
+use crate::shared::*;
 
 lazy_static! {
     static ref XRANDR_DISPLAY_INFORMATION_REGEX: Regex = {
@@ -127,6 +133,19 @@ impl MonitorState {
     pub fn get_brightness_state(&self) -> &BrightnessState {
         &self.brightness_state
     }
+}
+
+/// contains all the BrightnessState information with mappings to their respective monitors
+/// also keeps track of which monitors are enabled and which are disabled
+pub struct CollectiveMonitorStateInternal {
+    /// list of ALL MonitorState's, even those that are inactive/disabled/disconnected
+    available_adapter_list: Vec<MonitorState>,
+    /// list of monitor indices within available_adapter_list which are connected/usable
+    enabled_monitors: BTreeSet<usize>,
+    /// index of the "active" monitor
+    active_monitor: usize,
+    /// map between the name of each adapter and its index within the list
+    monitor_names: FnvHashMap<String, usize>
 }
 
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
