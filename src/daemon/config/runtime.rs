@@ -36,6 +36,65 @@ impl CachedState {
     }
 }
 
+/// Used in conjunction with ForwardedBrightnessInput
+/// Allows the daemon to reuse computed monitor indices after failing to lock the mutex and sending the
+/// input over the channel
+pub enum BrightnessInputInfo {
+    UnProcessed,
+    Processed {
+        relevant_monitor_indices: Vec<usize>,
+    }
+}
+
+impl BrightnessInputInfo {
+    // dont do any checking here because you are passing in the fields
+    pub fn transform_unprocessed(&mut self, relevant_monitor_indices: Vec<usize>) {
+        // TODO remove this checking
+        if let BrightnessInputInfo::Processed { .. } = self {
+            panic!("Tried to transform_unprocessed a Processed BrightnessInputInfo!");
+        }
+
+        *self = BrightnessInputInfo::Processed {
+            relevant_monitor_indices,
+        };
+    }
+
+    pub fn is_unprocessed(&self) -> bool {
+        matches!(self, BrightnessInputInfo::UnProcessed)
+    }
+}
+
+/// Struct holding all relevant variables for a client instruction
+/// Used to pass off the input to the async task locking the mutex required to process the
+/// BrightnessInput
+/// This is an alternative to waiting for the mutex to be released and not being guaranteed the
+/// lock afterwards
+pub struct ForwardedBrightnessInput {
+    pub brightness_input: BrightnessInput,
+    pub info: BrightnessInputInfo,
+    pub socket_message_holder: SocketMessageHolder
+}
+
+impl ForwardedBrightnessInput {
+    pub fn new_unprocessed(brightness_input: BrightnessInput, socket_message_holder: SocketMessageHolder) -> ForwardedBrightnessInput {
+        ForwardedBrightnessInput {
+            brightness_input,
+            socket_message_holder,
+            info: BrightnessInputInfo::UnProcessed
+        }
+    }
+
+    pub fn new_processed(brightness_input: BrightnessInput, socket_message_holder: SocketMessageHolder, relevant_monitor_indices: Vec<usize>) -> ForwardedBrightnessInput {
+        ForwardedBrightnessInput {
+            brightness_input,
+            socket_message_holder,
+            info: BrightnessInputInfo::Processed {
+                relevant_monitor_indices,
+            }
+        }
+    }
+}
+
 pub struct BrightnessState {
     // receiver end of channel in mutex
     pub brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<(BrightnessInput, SocketMessageHolder)>>,
