@@ -13,6 +13,7 @@ use serde::{Serialize, Deserialize};
 
 use std::cell::Cell;
 
+pub type BrightnessGuard<'a> = MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>;
 #[derive(Serialize, Deserialize)]
 pub struct CachedState {
     pub brightness_states: FnvHashMap<String, f64>,
