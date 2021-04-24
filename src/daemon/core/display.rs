@@ -193,6 +193,24 @@ impl CollectiveMonitorStateInternal {
         self.available_adapter_list.get(index)
     }
 
+    pub fn iter_all_monitor_indices(&self) -> impl Iterator<Item=usize> + '_ {
+        (0..self.available_adapter_list.len()).into_iter()
+    }
+
+    pub fn iter_active_monitor_indices(&self) -> impl Iterator<Item=usize> + '_ {
+        self.enabled_monitors.iter().map(|&x| x)
+    }
+
+    pub fn iter_active_monitor_states(&self) -> impl Iterator<Item=&MonitorState> + '_ {
+        // TODO filter map?
+        // ensure that the unwrap is guaranteed
+        self.enabled_monitors.iter().map(move |&x| self.available_adapter_list.get(x).unwrap())
+    }
+
+    pub fn iter_all_monitor_states(&self) -> impl Iterator<Item=&MonitorState> + '_ {
+        self.available_adapter_list.iter()
+    }
+
     // Monitor, is_connected
     pub fn state_overwrite(&mut self, displays_list: Vec<(Monitor, bool)>) {
         // clear the connected_displays set
