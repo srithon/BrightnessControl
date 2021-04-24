@@ -177,6 +177,63 @@ impl CollectiveMonitorStateInternal {
 
         monitor_states
     }
+
+    pub fn get_monitor_state_by_name(&self, name: &str) -> Option<&MonitorState> {
+        let index = self.get_monitor_index_by_name(name);
+
+        match index {
+            Some(&index) => {
+                self.available_adapter_list.get(index)
+            },
+            _ => None
+        }
+    }
+
+    pub fn get_monitor_state_by_index(&self, index: usize) -> Option<&MonitorState> {
+        self.available_adapter_list.get(index)
+    }
+
+    pub fn get_monitor_index_by_name(&self, name: &str) -> Option<&usize> {
+        self.monitor_names.get(name)
+    }
+
+    pub fn get_active_monitor_index(&self) -> &usize {
+        &self.active_monitor
+    }
+
+
+    fn clear_monitor_names(&mut self) {
+        self.monitor_names.clear()
+    }
+
+    fn clear_enabled_monitors(&mut self) {
+        self.enabled_monitors.clear()
+    }
+
+    fn add_enabled_monitor(&mut self, index: usize) {
+        self.enabled_monitors.insert(index);
+    }
+
+    fn monitor_is_enabled(&self, monitor_name: &str) -> bool {
+        if let Some(index) = self.get_monitor_index_by_name(monitor_name) {
+            self.enabled_monitors.contains(&index)
+        }
+        else {
+            false
+        }
+    }
+
+    pub fn remove_enabled_monitor_by_name(&mut self, monitor_name: &str) {
+        if let Some(&index) = self.get_monitor_index_by_name(monitor_name) {
+            self.enabled_monitors.remove(&index);
+        }
+    }
+
+    pub fn remove_enabled_monitor_by_index(&mut self, monitor_index: &usize) {
+        // TODO assert that the index is within the set?
+        // would simply assert the return value of this call
+        self.enabled_monitors.remove(monitor_index);
+    }
 }
 
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
