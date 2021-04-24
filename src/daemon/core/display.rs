@@ -387,6 +387,40 @@ pub struct CollectiveMonitorState {
     pub monitor_states: RwLock<CollectiveMonitorStateInternal>
 }
 
+#[macro_use]
+/// Private module to hide macro from importing modules
+mod PrivateMacros {
+    /// Given an optional MonitorOverride and a function that takes a MonitorState and returns
+    /// something convertible into a String, returns a concatenation of all the resulting Strings
+    /// joined together with newlines
+    /// If monitor_override is None, default to using all monitors (disabled and enabled)
+    macro_rules! collect_formatted_displays_string {
+        ($self:expr, $monitor_override:expr, $closure:expr, $separator:expr) => {
+            {
+                // exclusive read
+                let guard = $self.monitor_states.read().await;
+
+                if $monitor_override.is_none() {
+                    guard
+                        .iter_all_monitor_states()
+                        .map($closure)
+                        .collect::<Vec<_>>()
+                        .join($separator)
+                }
+                else {
+                    guard
+                        .get_monitor_override_indices($monitor_override.unwrap())
+                        .into_iter()
+                        .map(|monitor_index| guard.get_monitor_state_by_index(monitor_index).unwrap())
+                        .map($closure)
+                        .collect::<Vec<_>>()
+                        .join($separator)
+                }
+            }
+        }
+    }
+}
+
 impl CollectiveMonitorState {
     pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, f64>) -> CollectiveMonitorState {
         let internal = CollectiveMonitorStateInternal::new(active_monitor, brightness_states).await;
@@ -396,14 +430,34 @@ impl CollectiveMonitorState {
         }
     }
 
-    pub async fn get_formatted_display_names(&self) -> String {
-        // exclusive read
-        let guard = self.monitor_states.read().await;
-        guard
-            .iter_enabled_monitor_states()
-            .map(|monitor| &*monitor.monitor_data.adapter_name)
-            .collect::<Vec<&str>>()
-            .join(" ")
+    /// Returns space-separated list of display names matched by monitor_override
+    pub async fn get_formatted_display_names(&self, monitor_override: Option<&MonitorOverride>) -> String {
+        collect_formatted_displays_string!(self, monitor_override, |monitor_state| monitor_state.monitor_data.adapter_name.as_ref(), " ")
+    }
+
+    /// Returns newline-separated list of "<display name>: <brightness level>" for displays matched
+    /// by monitor_override
+    pub async fn get_formatted_display_states(&self, monitor_override: Option<&MonitorOverride>) -> String {
+        collect_formatted_displays_string!(self, monitor_override, |monitor_state|
+            format!("{}: {}",
+                monitor_state.monitor_data.adapter_name,
+                monitor_state.brightness_state.brightness.get()
+            ),
+            "\n"
+        )
+    }
+
+    /// Returns newline-separated list of "<display name>: <result of closure(&MonitorState)>" for
+    /// displays matched by monitor_override
+    pub async fn get_formatted_display_states_with_format<T: std::fmt::Display>(&self, monitor_override: Option<&MonitorOverride>, closure: impl Fn(&MonitorState) -> T) -> String
+    {
+        collect_formatted_displays_string!(self, monitor_override, |monitor_state|
+            format!("{}: {}",
+                monitor_state.monitor_data.adapter_name,
+                closure(monitor_state)
+            ),
+            "\n"
+        )
     }
 
     pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, CollectiveMonitorStateInternal> {
