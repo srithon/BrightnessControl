@@ -1,5 +1,7 @@
 use std::io::Result;
 
+use tokio::sync::RwLock;
+
 use tokio::process::Command;
 
 use std::collections::BTreeSet;
@@ -377,6 +379,12 @@ impl CollectiveMonitorStateInternal {
             }
         }
     }
+}
+
+/// RwLock wrapper around CollectiveMonitorStateInternal
+/// Provides thread-safety to single-threaded object
+pub struct CollectiveMonitorState {
+    pub monitor_states: RwLock<CollectiveMonitorStateInternal>
 }
 
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
