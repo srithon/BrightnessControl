@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader};
 
 use crate::shared::*;
 
-fn check_brightness(matches: &ArgMatches) -> Result<BrightnessInput> {
+fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverride>) -> Result<BrightnessInput> {
     let brightness = {
         if let Some(new_brightness) = matches.value_of("set") {
             // unwrap because caller should be doing input validation
@@ -54,32 +54,74 @@ fn check_brightness(matches: &ArgMatches) -> Result<BrightnessInput> {
         BrightnessInput {
             brightness,
             override_fade,
+            override_monitor,
             terminate_fade
         }
     )
 }
 
-fn check_get_property(matches: &ArgMatches) -> Option<GetProperty> {
+fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<GetProperty> {
     if let Some(get_argument) = matches.value_of("get") {
         if let Some(mut first_char) = get_argument.chars().next() {
             first_char.make_ascii_lowercase();
-            return match first_char {
-                'b' => Some(GetProperty::Brightness),
+            match first_char {
+                'b' => {
+                    let words = get_argument.split_whitespace().collect::<Vec<_>>();
+                    let num_words = words.len();
+
+                    if num_words > 1 {
+                        // TODO don't clone?
+                        let last_word = words.last().unwrap().to_ascii_lowercase();
+
+                        match last_word.as_ref() {
+                            "all" => Some(GetProperty::Brightness(Some(MonitorOverride::All))),
+                            "active" => Some(GetProperty::Brightness(Some(MonitorOverride::Active))),
+                            x => Some(GetProperty::Brightness(Some(MonitorOverride::Specified { adapter_name: x.to_string() })))
+                        }
+                    }
+                    else {
+                        Some(GetProperty::Brightness(None))
+                    }
+                },
                 'm' => Some(GetProperty::Mode),
                 'd' => Some(GetProperty::Displays),
                 'c' => Some(GetProperty::Config),
-                'i' => Some(GetProperty::IsFading),
+                'i' => Some(GetProperty::IsFading(monitor_override.clone())),
                 _ => None
             }
         }
+        else {
+            None
+        }
     }
+    else {
+        None
+    }
+}
 
-    None
+fn check_monitor_override(matches: &clap::ArgMatches) -> Option<MonitorOverride> {
+    if matches.is_present("monitor_override") {
+        let monitor_override = if let Some(monitor) = matches.value_of("monitor") {
+            MonitorOverride::Specified { adapter_name: monitor.to_string() }
+        }
+        else if matches.is_present("active") {
+            MonitorOverride::Active
+        }
+        else {
+            MonitorOverride::All
+        };
+
+        Some(monitor_override)
+    }
+    else {
+        None
+    }
 }
 
 pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
-    let brightness_subcommand = check_brightness(&matches)?;
-    let get_property = check_get_property(&matches);
+    let monitor_override = check_monitor_override(&matches);
+    let get_property = check_get_property(&matches, &monitor_override);
+    let brightness_subcommand = check_brightness(&matches, monitor_override)?;
 
     let program_input = ProgramInput::new(
         brightness_subcommand,
