@@ -24,10 +24,10 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
     };
 
     let property_validator = |arg: String| {
-        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, [m]ode and [i]s_fading";
+        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, [m]ode, [a]ctive_display and [i]s_fading";
 
         if arg.len() == 1 {
-            const CHARS: &[char] = &['b', 'c', 'd', 'm', 'i'];
+            const CHARS: &[char] = &['b', 'c', 'd', 'm', 'a', 'i'];
             let arg_char = arg.chars().next().unwrap();
             let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
 
@@ -39,7 +39,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             }
         }
         else {
-            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode", "is_fading"];
+            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode", "active_display", "is_fading"];
             let valid = OPTIONS.iter().any(|prop| arg.eq_ignore_ascii_case(prop));
 
             if !valid {
@@ -69,7 +69,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@arg force_fade: -f --fade requires[action] "Overrides the auto-fade functionality and fades regardless of the current configuration")
             (@arg force_no_fade: -n --("no-fade") requires[action] "Overrides the auto-fade functionality and does not fade regardless of the current configuration")
-            (@arg terminate_fade: -t --("terminate-fade") required_unless[action] "Terminates the current fade if one is currently running; this can be combined with one")
+            (@arg terminate_fade: -t --("terminate-fade") required_unless[action] "Terminates the current fade if one is currently running; this can be combined with one one of the brightness changing actions")
         )
         (@subcommand nightlight =>
             (about: "Holds commands relating to the nightlight")
