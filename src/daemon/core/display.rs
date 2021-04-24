@@ -148,6 +148,37 @@ pub struct CollectiveMonitorStateInternal {
     monitor_names: FnvHashMap<String, usize>
 }
 
+impl CollectiveMonitorStateInternal {
+    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, f64>) -> CollectiveMonitorStateInternal {
+        let initial_capacity = brightness_states.len() + 3;
+
+        let adapters = Vec::with_capacity(initial_capacity);
+        let enabled_monitors = BTreeSet::new();
+        let mut monitor_names = FnvHashMap::default();
+        monitor_names.reserve(initial_capacity);
+
+        let mut monitor_states = CollectiveMonitorStateInternal {
+            available_adapter_list: adapters,
+            enabled_monitors,
+            active_monitor,
+            monitor_names
+        };
+
+        // populates monitor_states fields
+        if let Err(e) = monitor_states.refresh_displays().await {
+            eprintln!("Error refreshing displays: {}", e);
+        }
+
+        for (adapter_name, brightness) in brightness_states {
+            if let Some(monitor_state) = monitor_states.get_monitor_state_by_name(&adapter_name) {
+                monitor_state.brightness_state.brightness.set_value(brightness).await;
+            }
+        }
+
+        monitor_states
+    }
+}
+
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
