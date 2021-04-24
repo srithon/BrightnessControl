@@ -32,13 +32,17 @@ lazy_static! {
     };
 }
 
-// encapsulates information from xrandr --current
-pub struct Monitor {
-    pub adapter_name: String,
+pub struct MonitorMetadata {
     pub width: u32,
     pub height: u32,
     pub x_offset: u32,
     pub y_offset: u32
+}
+
+// encapsulates information from xrandr --current
+pub struct Monitor {
+    adapter_name: String,
+    monitor_metadata: Option<MonitorMetadata>
 }
 
 impl Monitor {
