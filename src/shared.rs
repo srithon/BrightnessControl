@@ -20,6 +20,7 @@ pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
 pub struct BrightnessInput {
     pub brightness: Option<BrightnessChange>,
     pub override_fade: Option<bool>,
+    pub override_monitor: Option<MonitorOverride>,
     pub terminate_fade: bool
 }
 
@@ -73,8 +74,8 @@ pub enum MonitorOverrideTOMLCompatible {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum GetProperty {
-    Brightness,
-    IsFading,
+    Brightness(Option<MonitorOverride>),
+    IsFading(Option<MonitorOverride>),
     Mode,
     Displays,
     Config
