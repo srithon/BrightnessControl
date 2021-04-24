@@ -46,7 +46,8 @@ pub struct Monitor {
 }
 
 impl Monitor {
-    pub fn new(xrandr_line: &str) -> Option<Monitor> {
+    // returns (Monitor, connected)
+    pub fn new(xrandr_line: &str) -> Option<(Monitor, bool)> {
         // eDP-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis) 344mm x 193mm
         // HDMI-1 connected 1280x1024+1920+28 (normal left inverted right x axis y axis) 338mm x 270mm
         // <adapter> connected [primary] <width>x<height>+<x offset>+<y offset> (<flags>) <something>mm x <something else>mm
@@ -61,21 +62,41 @@ impl Monitor {
             };
 
             (|| {
-                let width = parse_int(captures.get(2).unwrap())?;
-                let height = parse_int(captures.get(3).unwrap())?;
-                let x_offset = parse_int(captures.get(4).unwrap())?;
-                let y_offset = parse_int(captures.get(5).unwrap())?;
+                let connected = {
+                    if let Some(capture) = captures.get(2) {
+                        !"disconnected".eq(capture.as_str())
+                    }
+                    else {
+                        false
+                    }
+                };
 
-                std::result::Result::<Option<Monitor>, std::num::ParseIntError>::Ok(
-                    Some(
-                        Monitor {
-                            adapter_name,
+                let monitor_metadata = {
+                    if connected {
+                        let width = parse_int(captures.get(3).unwrap())?;
+                        let height = parse_int(captures.get(4).unwrap())?;
+                        let x_offset = parse_int(captures.get(5).unwrap())?;
+                        let y_offset = parse_int(captures.get(6).unwrap())?;
+
+                        Some(MonitorMetadata {
                             width,
                             height,
                             x_offset,
                             y_offset
-                        }
-                    )
+                        })
+                    }
+                    else {
+                        None
+                    }
+                };
+
+                let monitor = Monitor {
+                    adapter_name,
+                    monitor_metadata
+                };
+
+                std::result::Result::<Option<(Monitor, bool)>, std::num::ParseIntError>::Ok(
+                    Some( (monitor, connected) )
                 )
             })().unwrap_or(None)
         }
