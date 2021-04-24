@@ -193,6 +193,40 @@ impl CollectiveMonitorStateInternal {
         self.available_adapter_list.get(index)
     }
 
+    // Monitor, is_connected
+    pub fn state_overwrite(&mut self, displays_list: Vec<(Monitor, bool)>) {
+        // clear the connected_displays set
+        // for each display
+        //  overwrite monitor metadata IF already present
+        //  if not present, append to the end with with default BrightnessState
+        //  add the returned indice to connected_displays
+        self.clear_enabled_monitors();
+
+        // this might not be necessary if the order doesnt change, but to be safe
+        self.clear_monitor_names();
+
+        for display in displays_list {
+            let index = self.overwrite_monitor_metadata(display.0);
+
+            // is_connected is true
+            if display.1 {
+                self.add_enabled_monitor(index);
+            }
+        }
+    }
+
+    pub async fn refresh_displays(&mut self) -> Result<()> {
+        let available_displays = get_available_displays().await;
+
+        match available_displays {
+            Ok(displays) => {
+                self.state_overwrite(displays);
+                Ok( () )
+            },
+            Err(e) => Err(e)
+        }
+    }
+
     pub fn get_monitor_index_by_name(&self, name: &str) -> Option<&usize> {
         self.monitor_names.get(name)
     }
@@ -201,6 +235,28 @@ impl CollectiveMonitorStateInternal {
         &self.active_monitor
     }
 
+    // returns Some(index) if the monitor was found, otherwise None
+    fn overwrite_monitor_metadata(&mut self, monitor: Monitor) -> usize {
+        if let Some(&index) = self.get_monitor_index_by_name(&monitor.name().to_ascii_lowercase()) {
+            self.available_adapter_list.get_mut(index).unwrap().monitor_data.update_metadata(monitor.monitor_metadata);
+            index
+        }
+        else {
+            let adapter_name = monitor.adapter_name.to_ascii_lowercase();
+
+            let monitor_state = MonitorState {
+                brightness_state: BrightnessState::new(100.0),
+                monitor_data: monitor
+            };
+
+            self.available_adapter_list.push(monitor_state);
+
+            let index = self.available_adapter_list.len() - 1;
+            self.monitor_names.insert(adapter_name, index);
+
+            index
+        }
+    }
 
     fn clear_monitor_names(&mut self) {
         self.monitor_names.clear()
