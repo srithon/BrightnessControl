@@ -387,6 +387,24 @@ pub struct CollectiveMonitorState {
     pub monitor_states: RwLock<CollectiveMonitorStateInternal>
 }
 
+impl CollectiveMonitorState {
+    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, f64>) -> CollectiveMonitorState {
+        let internal = CollectiveMonitorStateInternal::new(active_monitor, brightness_states).await;
+
+        CollectiveMonitorState {
+            monitor_states: RwLock::new(internal)
+        }
+    }
+
+    pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, CollectiveMonitorStateInternal> {
+        self.monitor_states.read().await
+    }
+
+    pub async fn write(&self) -> tokio::sync::RwLockWriteGuard<'_, CollectiveMonitorStateInternal> {
+        self.monitor_states.write().await
+    }
+}
+
 pub async fn get_current_connected_displays() -> Result<Vec<Monitor>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
