@@ -13,16 +13,21 @@ lazy_static! {
         # [[:alpha:]] represents ascii letters
         ^([[:alpha:]]+-[[:digit:]]+) # 0 : the adapter name
         \ # space
+        # 1 : 'disconnected' or 'connected ...'
+        (
+        disconnected
+        |
         connected
         \ # space
         .*? # optional other words
-        ([[:digit:]]+) # 1 : width
+        ([[:digit:]]+) # 2 : width
         x
-        ([[:digit:]]+) # 2 : height
+        ([[:digit:]]+) # 3 : height
         \+
-        ([[:digit:]]+) # 3 : x_offset
+        ([[:digit:]]+) # 4 : x_offset
         \+
-        ([[:digit:]]+) # 4 : y_offset
+        ([[:digit:]]+) # 5 : y_offset
+        )
         ").unwrap()
     };
 }
