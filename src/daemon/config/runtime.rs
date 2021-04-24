@@ -7,28 +7,32 @@ use super::super::super::shared::*;
 
 use tokio::sync::mpsc;
 
+use fnv::FnvHashMap;
+
 use serde::{Serialize, Deserialize};
 
 use std::cell::Cell;
 
 #[derive(Serialize, Deserialize)]
 pub struct CachedState {
-    pub brightness: f64,
-    pub nightlight: bool
-}
-
-impl CachedState {
-    pub fn validate(&self) -> bool {
-        self.brightness >= 0.0 && self.brightness <= 1.0
-    }
+    pub brightness_states: FnvHashMap<String, f64>,
+    pub nightlight: bool,
+    pub active_monitor: usize
 }
 
 impl Default for CachedState {
     fn default() -> Self {
         CachedState {
-            brightness: 1.0,
-            nightlight: false
+            brightness_states: FnvHashMap::default(),
+            nightlight: false,
+            active_monitor: 0
         }
+    }
+}
+
+impl CachedState {
+    pub fn validate(&self) -> bool {
+        self.brightness_states.iter().all(|(_, &brightness)| brightness >= 0.0 && brightness <= 1.0)
     }
 }
 
