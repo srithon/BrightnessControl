@@ -251,7 +251,7 @@ pub async fn get_configuration_from_file(configuration_file: &mut File) -> std::
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift, auto_remove_displays, fade_options, nightlight_options);
+    overwrite_values!(use_redshift, auto_remove_displays, fade_options, nightlight_options, monitor_default_behavior);
 
     Ok(config)
 }
