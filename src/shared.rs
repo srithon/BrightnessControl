@@ -78,6 +78,7 @@ pub enum GetProperty {
     IsFading(Option<MonitorOverride>),
     Mode,
     Displays,
+    ActiveMonitor,
     Config
 }
 
