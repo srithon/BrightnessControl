@@ -50,9 +50,8 @@ enum ProcessInputExitCode {
 // separate RwLocks so they can be modified concurrently
 struct Daemon {
     // these are primitives, so it doesn't matter
-    brightness: BrightnessState,
+    monitor_states: CollectiveMonitorState,
     mode: NonReadBlockingRWLock<bool, ()>,
-    displays: RwLock<Vec<Monitor>>,
     config: RwLock<DaemonOptions>,
     file_utils: FileUtils
 }
@@ -194,16 +193,12 @@ impl Daemon {
 
         println!("Loaded configuration: {:?}", config);
 
-        let (brightness, mode, displays) = {
-            let (cached_state, connected_displays) = tokio::try_join!(
-                file_utils.get_cached_state(),
-                get_current_connected_displays()
-            )?;
+        let (mode, monitor_states) = {
+            let cached_state = file_utils.get_cached_state().await?;
 
             (
-                BrightnessState::new(cached_state.brightness),
                 NonReadBlockingRWLock::new(cached_state.nightlight, ()),
-                RwLock::new(connected_displays)
+                CollectiveMonitorState::new(cached_state.active_monitor, cached_state.brightness_states).await
             )
         };
 
@@ -211,9 +206,8 @@ impl Daemon {
 
         Ok(
             Daemon {
-                brightness,
+                monitor_states,
                 mode,
-                displays,
                 config,
                 file_utils
             }
