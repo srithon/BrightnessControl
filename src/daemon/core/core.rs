@@ -217,11 +217,6 @@ impl Daemon {
         )
     }
 
-    // returns a string with the adapters separated by spaces
-    async fn get_formatted_displays_list(&self) -> String {
-        self.displays.read().await.iter().map(|monitor| &*monitor.adapter_name).collect::<Vec<&str>>().join(" ")
-    }
-
     async fn save_configuration(&self) -> Result<()> {
         let monitor_states = self.monitor_states.read().await;
 
