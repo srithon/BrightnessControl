@@ -15,13 +15,13 @@ use tokio::{
 
 use std::io::{Error, ErrorKind, Write as SyncWrite, Result};
 
-use std::cell::{ UnsafeCell };
+use std::cell::{ Cell, UnsafeCell };
 
-use std::collections::VecDeque;
+use std::collections::{ VecDeque, BTreeMap };
 
 use std::cmp;
 
-use futures::stream::FuturesOrdered;
+use futures::stream::{ FuturesUnordered, FuturesOrdered };
 
 use crate::daemon::fs::*;
 
@@ -503,12 +503,37 @@ impl Daemon {
     }
 
     async fn process_brightness_input(&self, brightness_change: BrightnessInput, socket_holder: SocketMessageHolder) {
+        println!("In processbrigtnesinput!");
+
         // push to this queue whenever new input comes in
-        let mut inputs = VecDeque::<(BrightnessInput, SocketMessageHolder)>::with_capacity(2);
-        inputs.push_back( (brightness_change, socket_holder) );
+        let mut inputs = VecDeque::<ForwardedBrightnessInput>::with_capacity(2);
+        inputs.push_back( ForwardedBrightnessInput::new_unprocessed(brightness_change, socket_holder) );
 
-        let mut persistent_guard = None;
+        struct BrightnessChangeInfo {
+            brightness_step: f64,
+            end_brightness: f64,
+            fade: bool
+        }
 
+        struct MonitorInfo<'a> {
+            current_brightness: BrightnessGuard<'a>,
+            is_fading: &'a Cell<bool>,
+            brightness_change_info: BrightnessChangeInfo
+        }
+
+        // ???
+        unsafe impl<'a> Send for MonitorInfo<'a> {}
+        unsafe impl<'a> Sync for MonitorInfo<'a> {}
+
+        // map between monitor index and BrightnessChangeInfo
+        let mut intermediate_brightness_states: BTreeMap<usize, MonitorInfo> = BTreeMap::new();
+
+        // use the read() and write() functions
+        // this used to be on the inside of the loop so we would have to retake the lock every time
+        // should we do it like that again?
+        let monitor_states_guard = self.monitor_states.read().await;
+
+        // process inputs queue
         'base_loop: loop {
             let head = inputs.pop_front();
 
@@ -516,179 +541,287 @@ impl Daemon {
                 break;
             }
 
-            let ( brightness_change, mut socket_holder ) = head.unwrap();
+            let ForwardedBrightnessInput {
+                brightness_input,
+                mut socket_message_holder,
+                mut info
+            } = head.unwrap();
 
-            let current_brightness = self.brightness.get();
+            if info.is_unprocessed() {
+                let monitor_indices = {
+                    let config = self.config.read().await;
 
-            let new_brightness = {
-                let integer_representation = match brightness_change.brightness {
-                    Some(BrightnessChange::Set(new_brightness)) => new_brightness,
-                    Some(BrightnessChange::Adjustment(brightness_shift)) => {
-                        cmp::max(cmp::min(brightness_shift as i16 + (current_brightness as i16), 100 as i16), 0) as u8
-                    },
-                    None => current_brightness as u8
+                    let override_monitor = {
+                        if let Some(ref override_monitor) = &brightness_input.override_monitor {
+                            override_monitor
+                        }
+                        else {
+                            &config.monitor_default_behavior
+                        }
+                    };
+
+                    monitor_states_guard.get_monitor_override_indices(override_monitor)
                 };
 
-                integer_representation as f64
+                println!("Monitor indices: {:#?}", monitor_indices);
+
+                info.transform_unprocessed(monitor_indices);
+            }
+
+            let relevant_monitor_indices = match info {
+                BrightnessInputInfo::Processed { relevant_monitor_indices } => relevant_monitor_indices,
+                _ => unreachable!("Info should have been transformed!")
             };
 
-            let total_brightness_shift = new_brightness - current_brightness;
+            // Printing out the starting brightness for all affected monitors
+            for &i in relevant_monitor_indices.iter() {
+                let f = monitor_states_guard.get_monitor_state_by_index(i).unwrap();
+                println!("Original Brightness: {}", f.get_brightness_state().brightness.get());
+            }
+
+            // remove all irrelevant intermediate_brightness_states
+            // this releases the mutices associated with them
+            // TODO can we assume that relevant_monitor_indices is sorted?
+            // TODO improve complexity
+            // TODO consider using a BTreeSet for relevant_monitor_indices?
+            {
+                let keys_to_remove: Vec<_> = intermediate_brightness_states.keys().map(|&index| index).filter(|index| !relevant_monitor_indices.contains(&index)).collect();
+
+                for key in keys_to_remove {
+                    intermediate_brightness_states.remove(&key);
+                }
+            }
+
+            let optional_guards: Vec<Option<BrightnessGuard>> = relevant_monitor_indices
+                .iter()
+                .map(|&index| monitor_states_guard
+                    .get_monitor_state_by_index(index)
+                    .expect("monitor state not in vector")
+                    .get_brightness_state()
+                    .try_lock_brightness()
+                ).collect();
+
+            // TODO make this random so there is no preference towards those in the beginning of
+            // the list
+            let first_none_guard_index = optional_guards.iter().position(|x| x.is_none());
+
+            if let Some(index) = first_none_guard_index {
+                // pass everything along to the owner of the receiver
+                // someone else has the lock
+                // they may be fading
+                // try sending input over the mpsc channel
+                // respond?
+                let brightness_state = monitor_states_guard.get_monitor_state_by_index(index).expect("Monitor state found from find() not in the list?").get_brightness_state();
+
+                let send_channel = brightness_state.get_fade_notifier();
+
+                let forwarded_brightness_input = ForwardedBrightnessInput::new_processed(brightness_input, socket_message_holder, relevant_monitor_indices);
+
+                let _ = send_channel.send( forwarded_brightness_input );
+
+                // send all the ones that are queued
+                // theoretically this should always be empty
+                for input in inputs.into_iter() {
+                    let _ = send_channel.send(input);
+                }
+
+                return;
+            }
 
             // TODO don't clone this
             let fade_options = &self.config.read().await.fade_options.clone();
-            let fade = {
-                match &brightness_change.override_fade {
-                    None => total_brightness_shift.abs() as u8 > fade_options.threshold,
-                    Some(x) => *x
-                }
-            };
 
-            let optional_guard = {
-                if brightness_change.terminate_fade {
-                    // interrupt fade
-                    // if there is actually someone else modifying the brightness
-                    // note that this may not necessarily be a fade
-                    // if it is not a fade, then we have nothing to worry about
-                    // it will terminate on its own
-                    if let x @ Some(_) = persistent_guard.take().or_else(|| self.brightness.try_lock_brightness()) {
-                        x
-                    }
-                    else {
-                        // someone else has the lock
-                        // they may be fading
-                        // try sending input over the mpsc channel
-                        // respond?
-                        let send_channel = self.brightness.get_fade_notifier();
+            // fade
+            let total_num_steps = fade_options.total_duration / fade_options.step_duration;
 
-                        let _ = send_channel.send( (brightness_change, socket_holder) );
+            // populate intermediate_brightness_states with current brightnesses
+            optional_guards.into_iter().enumerate().for_each(|(i, guard)| {
+                let monitor_index = relevant_monitor_indices[i];
+                // intermediate_brightness_states.insert(monitor_index, guard.unwrap().get());
 
-                        // send all the ones that are queued
-                        // theoretically this should always be empty
-                        for input in inputs.into_iter() {
-                            let _ = send_channel.send( (input.0, input.1) );
-                        }
+                let brightness_state = monitor_states_guard.get_monitor_state_by_index(monitor_index).expect("monitor state index not found").get_brightness_state();
 
-                        return;
-                    }
-                }
-                else {
-                    None
-                }
-            };
+                let current_brightness = guard.as_ref().unwrap().get();
 
-            if !fade {
-                if let Some(mut guard) = optional_guard {
-                    guard.set(new_brightness);
-                }
-                else {
-                    self.brightness.brightness.set_value(new_brightness).await;
-                }
+                let new_brightness = {
+                    let integer_representation = match brightness_input.brightness {
+                        Some(BrightnessChange::Set(new_brightness)) => new_brightness,
+                        Some(BrightnessChange::Adjustment(brightness_shift)) => {
+                            cmp::max(cmp::min(brightness_shift as i16 + (current_brightness as i16), 100 as i16), 0) as u8
+                        },
+                        None => current_brightness as u8
+                    };
 
-                // this returns true if refresh_brightness reconfigured the display automatically
-                // dont want to reconfigure AGAIN
-                match self.refresh_brightness().await {
-                    Ok(_) => {
-                        socket_holder.queue_success(format!("Set brightness to {}%", self.brightness.get()));
-                    },
-                    Err(e) => {
-                        socket_holder.queue_error(format!("Failed to refresh brightness: {}", e));
+                    integer_representation as f64
+                };
+
+                let total_brightness_shift = new_brightness - current_brightness;
+
+                let fade = {
+                    match &brightness_input.override_fade {
+                        None => total_brightness_shift.abs() as u8 > fade_options.threshold,
+                        Some(x) => *x
                     }
                 };
-            }
-            else {
-                self.brightness.is_fading.set(true);
-
-                // fade
-                let total_num_steps = fade_options.total_duration / fade_options.step_duration;
 
                 let brightness_step = total_brightness_shift / (total_num_steps as f64);
 
-                // the last step is dedicated to setting the brightness exactly to
-                // new_brightness
-                // if we only went by adding brightness_step, we would not end up exactly where
-                // we wanted to be
-                let iterator_num_steps = total_num_steps - 1;
-
-                let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
-
-                if let Err(e) = self.refresh_brightness().await {
-                    socket_holder.queue_error(format!("Error refreshing brightness: {}", e));
-                }
-
-                let mut brightness_guard = {
-                    if let Some(guard) = optional_guard {
-                        guard
-                    }
-                    else {
-                        self.brightness.lock_brightness().await
+                let brightness_input_info = MonitorInfo {
+                    // TODO verify that this works
+                    current_brightness: guard.unwrap(),
+                    is_fading: &brightness_state.is_fading,
+                    brightness_change_info: BrightnessChangeInfo {
+                        end_brightness: new_brightness,
+                        brightness_step,
+                        fade
                     }
                 };
 
-                for _ in 0..iterator_num_steps {
-                    let brightness = self.brightness.get() + brightness_step;
+                intermediate_brightness_states.insert(monitor_index, brightness_input_info);
+            });
 
-                    brightness_guard.set(brightness);
+            // print out intermediate brightness states
+            for i in &intermediate_brightness_states {
+                println!("{}: {}", i.0, i.1.current_brightness.get());
+            }
 
-                    let brightness_string = format!("{:.5}", brightness / 100.0);
+            // TODO drain filter all the ones that will not be faded
+            // alternative: partition into fade and non-fade
+            // used relevant_monitor_indices instead of intermediate_brightness_states for
+            // partition because you cannot map after partition
+            let (to_fade_unsafe_cell, mut to_not_fade): (UnsafeCell<Vec<_>>, Vec<_>) = {
+                let (to_fade, to_not_fade): (Vec<_>, Vec<_>) = intermediate_brightness_states
+                    .iter_mut()
+                    .partition(|(_, monitor_info)|
+                        monitor_info
+                        .brightness_change_info
+                        .fade
+                    );
 
-                    let commands = self.create_xrandr_commands_with_brightness(brightness_string).await;
+                // UnsafeCell usage explained below; we need a mutable reference at one point
+                (UnsafeCell::new(to_fade), to_not_fade)
+            };
 
-                    for mut command in commands {
-                        match command.spawn() {
-                            Ok(call_handle) => {
-                                tokio::spawn(call_handle);
-                            },
-                            Err(e) => {
-                                socket_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
-                            }
-                        };
+            for (_, entry) in to_not_fade.iter_mut() {
+                entry.current_brightness.set(entry.brightness_change_info.end_brightness);
+                // TODO
+                // actually probably don't want to remove this here
+                // you should wait till the other monitors are done fading
+                // intermediate_brightness_states.remove(index);
+            }
+
+
+            // this returns true if refresh_brightness reconfigured the display automatically
+            // dont want to reconfigure AGAIN
+            // TODO consider doing this individually for each monitor
+            // so that we can get different messages for each one
+            match self.refresh_brightness(to_not_fade.iter().map(|(&i, _)| i)).await {
+                Ok(_) => {
+                    for (brightness, adapter_name) in to_not_fade.into_iter().map(|(&i, monitor_info)| (monitor_info.brightness_change_info.end_brightness, monitor_states_guard.get_monitor_state_by_index(i).unwrap().get_monitor_name())) {
+                        socket_message_holder.queue_success(format!("Set {} brightness to {}%\n", adapter_name, brightness));
                     }
-
-                    let mut delay_future = tokio::time::delay_for(fade_step_delay);
-
-                    // this has to be mutable to call recv() on it
-                    let receiver = &mut *brightness_guard.mutex_guard;
-
-                    loop {
-                        select! {
-                            _ = &mut delay_future => break,
-                            Some( (input, other_socket_holder) ) = receiver.recv() => {
-                                let terminate_fade = input.terminate_fade;
-
-                                inputs.push_back( (input, other_socket_holder) );
-
-                                // interrupt current fade by continuing base loop
-                                // if terminate_fade is true
-                                //
-                                // otherwise the queued input will be processed in the next
-                                // iteration of the loop
-                                if terminate_fade {
-                                    socket_holder.consume();
-                                    self.brightness.is_fading.set(false);
-                                    continue 'base_loop;
-                                }
-                            }
-                        };
-                    };
+                    // socket_message_holder.queue_success(format!("Successfully modified brightness"));
+                },
+                Err(e) => {
+                    socket_message_holder.queue_error(format!("Failed to refresh brightness: {}", e));
                 }
+            };
 
-                self.brightness.is_fading.set(false);
+            let to_fade = unsafe {
+                to_fade_unsafe_cell.get().as_mut().unwrap()
+            };
 
-                brightness_guard.set(new_brightness);
-
-                persistent_guard = Some(brightness_guard);
-
-                match self.refresh_brightness().await {
-                    Ok(_) => {
-                        socket_holder.queue_success(format!("Completed fade to brightness: {}", new_brightness));
-                    }
-                    Err(e) => {
-                        socket_holder.queue_error(format!("Failed to complete fade: {}", e));
+            macro_rules! set_fading_status {
+                ($status:expr) => {
+                    for (_, monitor_info) in to_fade.iter() {
+                        monitor_info.is_fading.set($status)
                     }
                 }
             }
 
-            socket_holder.consume();
+            set_fading_status!(true);
+
+            // the last step is dedicated to setting the brightness exactly to
+            // new_brightness
+            // if we only went by adding brightness_step, we would not end up exactly where
+            // we wanted to be
+            let iterator_num_steps = total_num_steps - 1;
+
+            let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
+
+            macro_rules! fade_iterator {
+                () => {
+                    to_fade.iter().map(|(&i, _)| i)
+                }
+            }
+
+            if let Err(e) = self.refresh_brightness(fade_iterator!()).await {
+                socket_message_holder.queue_error(format!("Error refreshing brightness: {}", e));
+            }
+
+            // the problem here is that in order to get the futures from the mutex recv() function,
+            // we need a mutable reference to the mutex guard, and as a result a mutable reference
+            // to (eventually) the to_fade iterator
+            // is there a way to iterate immutably over to_fade while still getting a mutable
+            // reference to mutex_guard?
+            //
+            // FuturesUnordered because we only care if ONE OF the futures resolves
+            // the actual "order" of the futures is meaningless since that is just the order of the
+            // adapters
+            let mut receiver_futures = unsafe {
+                let to_fade_alias = to_fade_unsafe_cell.get().as_mut().unwrap();
+                to_fade_alias
+                    .iter_mut()
+                    .map(|(_, monitor_info)| {
+                        monitor_info.current_brightness.mutex_guard.recv()
+                    }).collect::<FuturesUnordered<_>>()
+            };
+
+            for _ in 0..iterator_num_steps {
+                for (i, (_, monitor_info)) in to_fade.iter_mut().enumerate() {
+                    println!("Starting {} brightness: {}", i, monitor_info.current_brightness.get());
+                    let brightness = monitor_info.current_brightness.get() + monitor_info.brightness_change_info.brightness_step;
+                    println!("{} brightness: {}", i, brightness);
+                    monitor_info.current_brightness.set(brightness);
+                }
+
+                if let Err(e) = self.refresh_brightness(fade_iterator!()).await {
+                    socket_message_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
+                }
+
+                let mut delay_future = tokio::time::delay_for(fade_step_delay);
+
+                // monitors 2 futures
+                // delay_future: checks to see if the fade delay is up
+                // receiver_futures.next(): checks to see if any ForwardedBrightnessInput's have
+                // been sent over the mutex's channel
+                // if it receives a ForwardedBrightnessInput, it will add it to the queue or
+                // process it immediately if its terminate_fade flag is set to true
+                loop {
+                    select! {
+                        _ = &mut delay_future => break,
+                        Some( Some( forwarded_brightness_input ) ) = receiver_futures.next() => {
+                            let terminate_fade = forwarded_brightness_input.brightness_input.terminate_fade;
+
+                            inputs.push_back(forwarded_brightness_input);
+
+                            // interrupt current fade by continuing base loop
+                            // if terminate_fade is true
+                            //
+                            // otherwise the queued input will be processed in the next
+                            // iteration of the loop
+                            if terminate_fade {
+                                socket_message_holder.consume();
+                                set_fading_status!(false);
+                                continue 'base_loop;
+                            }
+                        }
+                    };
+                };
+            }
+
+            // send messages to client
+            socket_message_holder.consume();
         }
     }
 
