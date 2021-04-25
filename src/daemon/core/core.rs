@@ -415,12 +415,14 @@ impl Daemon {
         }
 
         if let Some(property) = get_property {
+            // TODO create macro that yields an iterator over MonitorState's
             let property_value = match property {
-                GetProperty::Brightness => {
-                    format!("{}", self.brightness.get())
+                GetProperty::Brightness(optional_monitor_override) => {
+                    self.monitor_states.get_formatted_display_states(optional_monitor_override.as_ref()).await
                 },
                 GetProperty::Displays => {
-                    self.get_formatted_displays_list().await
+                    // TODO take a MonitorOverride for this one too
+                    self.monitor_states.get_formatted_display_names(Some(&MonitorOverride::All)).await
                 },
                 GetProperty::Mode => {
                     format!("{}", self.mode.get() as i32)
@@ -428,15 +430,25 @@ impl Daemon {
                 GetProperty::Config => {
                     format!("{:?}", *self.config.read().await)
                 },
-                GetProperty::IsFading => {
+                GetProperty::IsFading(optional_monitor_override) => {
                     // return "1" if currently fading
                     // else "0"
-                    if self.brightness.is_fading.get() {
-                        "1"
-                    }
-                    else {
-                        "0"
-                    }.to_owned()
+                    self.monitor_states.get_formatted_display_states_with_format(optional_monitor_override.as_ref(), |monitor_state| {
+                        let is_fading = monitor_state.brightness_state.is_fading.get();
+
+                        if is_fading {
+                            "1"
+                        }
+                        else {
+                            "0"
+                        }
+                    }).await
+                },
+                GetProperty::ActiveMonitor => {
+                    let monitors = self.monitor_states.read().await;
+                    let active_index = *monitors.get_active_monitor_index();
+                    let active_monitor_state = monitors.get_monitor_state_by_index(active_index).unwrap();
+                    format!("{}", active_monitor_state.get_monitor_name())
                 }
             };
 
