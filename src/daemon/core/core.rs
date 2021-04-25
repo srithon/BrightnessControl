@@ -220,9 +220,19 @@ impl Daemon {
     }
 
     async fn save_configuration(&self) -> Result<()> {
+        let monitor_states = self.monitor_states.read().await;
+
+        let iterator = monitor_states.iter_all_monitor_states();
+
+        let mut map = fnv::FnvHashMap::default();
+        for monitor_state in iterator {
+            map.insert(monitor_state.get_monitor_name().to_owned(), monitor_state.get_brightness_state().get());
+        }
+
         let cached_state = CachedState {
-            brightness: self.brightness.get(),
-            nightlight: self.mode.get()
+            brightness_states: map,
+            nightlight: self.mode.get(),
+            active_monitor: *monitor_states.get_active_monitor_index()
         };
 
         let res = try_join!(
