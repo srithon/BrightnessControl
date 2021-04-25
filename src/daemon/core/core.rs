@@ -833,14 +833,8 @@ impl Daemon {
     }
 
     async fn reconfigure_displays(&self) -> Result<()> {
-        let new_displays = configure_displays().await?;
+        self.monitor_states.write().await.refresh_displays().await?;
 
-        // immutable update
-        // self.displays.clear();
-        // self.displays.clone_from(&new_displays);
-
-        // mutable update
-        *self.displays.write().await = new_displays;
         Ok(())
     }
 
