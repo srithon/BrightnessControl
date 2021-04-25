@@ -9,8 +9,8 @@ use std::io::{BufRead, BufReader};
 
 use crate::shared::*;
 
-fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverride>) -> Result<BrightnessInput> {
-    let res = if let Some(brightness_matches) = matches.subcommand_matches("brightness") {
+fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverride>) -> BrightnessInput {
+    if let Some(brightness_matches) = matches.subcommand_matches("brightness") {
         let brightness_change = if let Some(new_brightness) = brightness_matches.value_of("set") {
             // unwrap because caller should be doing input validation
             Some(BrightnessChange::Set(new_brightness.parse::<u8>().unwrap()))
@@ -57,9 +57,7 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
         }
     } else {
         BrightnessInput::default()
-    };
-
-    Ok(res)
+    }
 }
 
 fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<GetProperty> {
@@ -121,7 +119,7 @@ fn check_monitor_override(matches: &clap::ArgMatches) -> Option<MonitorOverride>
 pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
     let monitor_override = check_monitor_override(&matches);
     let get_property = check_get_property(&matches, &monitor_override);
-    let brightness_subcommand = check_brightness(&matches, monitor_override)?;
+    let brightness_subcommand = check_brightness(&matches, monitor_override);
 
     let program_input = ProgramInput::new(
         brightness_subcommand,
