@@ -247,7 +247,7 @@ impl Daemon {
 
     async fn refresh_brightness_all(&self) -> Result<bool> {
         self.refresh_brightness(
-            self.monitor_states.read().await.get_monitor_override_indices(&MonitorOverride::All).into_iter()
+            self.monitor_states.read().await.get_monitor_override_indices(&MonitorOverride::Enabled).into_iter()
         ).await
     }
 
