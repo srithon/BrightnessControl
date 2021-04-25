@@ -247,14 +247,13 @@ impl Daemon {
 
     async fn refresh_brightness_all(&self) -> Result<bool> {
         self.refresh_brightness(
-            self.monitor_states.read().await.get_monitor_override_indices(&MonitorOverride::Enabled).into_iter()
+            self.monitor_states.read().await.get_monitor_override_indices(&MonitorOverride::Enabled).into_iter(), true
         ).await
     }
 
     // boolean signals whether the function removed any monitors from self.displays
-    async fn refresh_brightness(&self, monitors: impl Iterator<Item=usize>) -> Result<bool> {
+    async fn refresh_brightness(&self, monitors: impl Iterator<Item=usize>, auto_remove_displays: bool) -> Result<bool> {
         let commands = self.create_xrandr_commands(monitors).await;
-        let auto_remove_displays = self.config.read().await.auto_remove_displays;
 
         if auto_remove_displays {
             // use UnsafeCell to have 2 separate iterators
@@ -724,6 +723,7 @@ impl Daemon {
                 // intermediate_brightness_states.remove(index);
             }
 
+            let auto_remove_displays = self.config.read().await.auto_remove_displays;
 
             // this returns true if refresh_brightness reconfigured the display automatically
             // dont want to reconfigure AGAIN
@@ -732,7 +732,7 @@ impl Daemon {
             //
             // filter out disabled monitors when calling refresh_brightness, but not when printing
             // out "set brightness"
-            match self.refresh_brightness(to_not_fade.iter().filter(|(_, monitor_info)| monitor_info.is_enabled).map(|(&i, _)| i)).await {
+            match self.refresh_brightness(to_not_fade.iter().filter(|(_, monitor_info)| monitor_info.is_enabled).map(|(&i, _)| i), auto_remove_displays).await {
                 Ok(_) => {
                     for (brightness, adapter_name) in to_not_fade.into_iter().map(|(&i, monitor_info)| (monitor_info.brightness_change_info.end_brightness, monitor_states_guard.get_monitor_state_by_index(i).unwrap().get_monitor_name())) {
                         socket_message_holder.queue_success(format!("Set {} brightness to {}%\n", adapter_name, brightness));
@@ -772,7 +772,7 @@ impl Daemon {
                 }
             }
 
-            if let Err(e) = self.refresh_brightness(fade_iterator!()).await {
+            if let Err(e) = self.refresh_brightness(fade_iterator!(), auto_remove_displays).await {
                 socket_message_holder.queue_error(format!("Error refreshing brightness: {}", e));
             }
 
@@ -802,7 +802,11 @@ impl Daemon {
                     monitor_info.current_brightness.set(brightness);
                 }
 
-                if let Err(e) = self.refresh_brightness(fade_iterator!()).await {
+                // do not autoremove displays because we do not want to slow it down
+                // autoremove means that we will have to wait for the exit codes from each xrandr
+                // process to return before moving on
+                // we optimize the loop by only looking at the exit codes in the very beginning
+                if let Err(e) = self.refresh_brightness(fade_iterator!(), false).await {
                     socket_message_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
                 }
 
