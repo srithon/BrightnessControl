@@ -299,6 +299,10 @@ impl CollectiveMonitorStateInternal {
         }
     }
 
+    pub fn is_monitor_index_enabled(&self, monitor_index: usize) -> bool {
+        self.enabled_monitors.contains(&monitor_index)
+    }
+
     pub fn remove_enabled_monitor_by_name(&mut self, monitor_name: &str) {
         if let Some(&index) = self.get_monitor_index_by_name(monitor_name) {
             self.enabled_monitors.remove(&index);
