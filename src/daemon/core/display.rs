@@ -323,6 +323,10 @@ impl CollectiveMonitorStateInternal {
     pub fn for_each_monitor_override_iterator(&self, monitors: &MonitorOverride, closure: &mut impl FnMut(usize)) {
         match monitors {
             MonitorOverride::All => {
+                let iterator = self.iter_all_monitor_indices();
+                iterator.for_each(closure)
+            },
+            MonitorOverride::Enabled => {
                 let iterator = self.iter_enabled_monitor_indices();
                 iterator.for_each(closure)
             },
