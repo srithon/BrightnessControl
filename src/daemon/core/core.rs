@@ -86,9 +86,8 @@ impl DaemonWrapper {
         // if any message is sent over the channel, the dameon starts shutting down
         let (tx, mut rx) = mpsc::channel::<()>(30);
 
-        println!("Brightness: {}", daemon.brightness.get());
         println!("Mode: {}", daemon.mode.get());
-        println!("Displays: {}", daemon.get_formatted_displays_list().await);
+        println!("{}", daemon.monitor_states.get_formatted_display_states(Some(&MonitorOverride::All)).await);
 
         try_join!(
             async move {
