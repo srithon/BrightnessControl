@@ -24,6 +24,16 @@ use_redshift = false
 # to that display
 auto_remove_displays = true
 
+# determines which monitors to affect when no monitor override is specified on the command line
+[monitor_default_behavior]
+# OPTIONS
+# type = "Specified"
+# adapter_name = "<Specified Adapter Name>"
+#
+# type = "Active"
+#
+type = "All"
+
 [nightlight_options]
 # When use_redshift is set to false, BrightnessControl uses xrandr --gamma to
 # emulate a nightlight
