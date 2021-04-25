@@ -25,7 +25,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
 
     clap_app!(BrightnessControl =>
         (@setting VersionlessSubcommands)
-        (@setting ArgsNegateSubcommands)
         (version: crate_version!())
         (author: "Sridaran Thoniyil")
         (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
