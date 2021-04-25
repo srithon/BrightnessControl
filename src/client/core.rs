@@ -61,31 +61,36 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
 }
 
 fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<GetProperty> {
-    let present = |name| {
-        matches.is_present(name)
-    };
-
-    if matches.is_present("get_request") {
-        let res = if present("brightness") {
-           GetProperty::Brightness(monitor_override.clone())
-        }
-        else if present("mode") {
-            GetProperty::Mode
-        }
-        else if present("displays") {
-            GetProperty::Displays
-        }
-        else if present("fading") {
-            GetProperty::IsFading(monitor_override.clone())
-        }
-        else if present("config") {
-            GetProperty::Config
-        }
-        else {
-            unreachable!("Invalid get argument")
+    if let Some(get_subcommand) = matches.subcommand_matches("get") {
+        let present = |name| {
+            get_subcommand.is_present(name)
         };
 
-        Some(res)
+        if get_subcommand.is_present("get_request") {
+            let res = if present("brightness") {
+                GetProperty::Brightness(monitor_override.clone())
+            }
+            else if present("mode") {
+                GetProperty::Mode
+            }
+            else if present("displays") {
+                GetProperty::Displays
+            }
+            else if present("fading") {
+                GetProperty::IsFading(monitor_override.clone())
+            }
+            else if present("config") {
+                GetProperty::Config
+            }
+            else {
+                unreachable!("Invalid get argument")
+            };
+
+            Some(res)
+        }
+        else {
+            None
+        }
     }
     else {
         None
