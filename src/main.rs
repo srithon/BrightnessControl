@@ -57,6 +57,11 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (version: crate_version!())
         (author: "Sridaran Thoniyil")
         (about: "BrightnessControl is an XRandr interface which allows users to make relative brightness adjustments easily.")
+        (@group monitor_override =>
+            (@arg monitor: -m --monitor +takes_value value_name[ADAPTER_NAME] "Apply brightness changes to a specific display")
+            (@arg active: --active "Apply brightness changes to the \"active\" monitor; note that this is \"active\" monitor is specific to BrightnessControl and has nothing to do with mouse location or keyboard focus")
+            (@arg all: -a --all "Apply brightness changes to ALL connected monitors")
+        )
         (@subcommand brightness =>
             (about: "Holds commands involving brightness modification")
             (visible_alias: "b")
@@ -65,11 +70,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg increment: -i --increment +takes_value value_name[PERCENTAGE] {percentage_validator} "Increases the current brightness by %")
                 (@arg decrement: -d --decrement +takes_value value_name[PERCENTAGE] {percentage_validator} "Decrements the current brightness by %")
                 (@arg set: -s --set +takes_value value_name[PERCENTAGE] {percentage_validator} "Sets the current brightness to %")
-            )
-            (@group monitor_override =>
-                (@arg monitor: -m --monitor +takes_value value_name[ADAPTER_NAME] "Apply brightness changes to a specific display")
-                (@arg active: --active "Apply brightness changes to the \"active\" monitor; note that this is \"active\" monitor is specific to BrightnessControl and has nothing to do with mouse location or keyboard focus")
-                (@arg all: -a --all "Apply brightness changes to ALL connected monitors")
             )
             (@arg quiet: -q --quiet "Do not wait for the Daemon's output before terminating")
             (@arg force_fade: -f --fade requires[action] "Overrides the auto-fade functionality and fades regardless of the current configuration")
