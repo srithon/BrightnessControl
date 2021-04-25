@@ -109,7 +109,11 @@ impl DaemonWrapper {
                                 // Rust is amazing
                                 // the compiler figured out the type of program_input based on the call to
                                 // daemon.process_input 5 lines below
-                                let mut stream_buffer: [u8; 20] = [0; 20];
+
+                                // https://github.com/bincode-org/bincode
+                                // "The size of the encoded object will be the same or smaller than the size that the object takes up in memory in a running Rust program."
+                                const STREAM_BUFFER_SIZE: usize = std::mem::size_of::<ProgramInput>();
+                                let mut stream_buffer: [u8; STREAM_BUFFER_SIZE] = [0; STREAM_BUFFER_SIZE];
 
                                 let num_bytes: usize = stream.read(&mut stream_buffer[..]).await?;
 
