@@ -61,38 +61,22 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
 }
 
 fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<GetProperty> {
-    if let Some(get_argument) = matches.value_of("get") {
-        if let Some(mut first_char) = get_argument.chars().next() {
-            first_char.make_ascii_lowercase();
-            match first_char {
-                'b' => {
-                    let words = get_argument.split_whitespace().collect::<Vec<_>>();
-                    let num_words = words.len();
-
-                    if num_words > 1 {
-                        // TODO don't clone?
-                        let last_word = words.last().unwrap().to_ascii_lowercase();
-
-                        match last_word.as_ref() {
-                            "all" => Some(GetProperty::Brightness(Some(MonitorOverride::All))),
-                            "active" => Some(GetProperty::Brightness(Some(MonitorOverride::Active))),
-                            x => Some(GetProperty::Brightness(Some(MonitorOverride::Specified { adapter_name: x.to_string() })))
-                        }
-                    }
-                    else {
-                        Some(GetProperty::Brightness(None))
-                    }
-                },
-                'm' => Some(GetProperty::Mode),
-                'd' => Some(GetProperty::Displays),
-                'c' => Some(GetProperty::Config),
-                'i' => Some(GetProperty::IsFading(monitor_override.clone())),
-                _ => None
+    if let Some(get_matches) = matches.subcommand_matches("get") {
+        let res = if let Some(request) = get_matches.value_of("action") {
+            match request {
+                "brightness" => GetProperty::Brightness(monitor_override.clone()),
+                "mode" => GetProperty::Mode,
+                "displays" => GetProperty::Displays,
+                "fading" => GetProperty::IsFading(monitor_override.clone()),
+                "config" => GetProperty::Config,
+                _ => unreachable!("Invalid get argument: {}", request)
             }
         }
         else {
-            None
-        }
+            panic!("'action' not present in arguments?")
+        };
+
+        Some(res)
     }
     else {
         None
