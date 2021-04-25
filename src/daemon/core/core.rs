@@ -886,6 +886,7 @@ fn register_sigterm_handler() -> Result<()> {
                             brightness: BrightnessInput {
                                 brightness: None,
                                 override_fade: None,
+                                override_monitor: None,
                                 terminate_fade: false
                             },
                             get_property: None,
