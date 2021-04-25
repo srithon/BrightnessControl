@@ -98,39 +98,27 @@ fn main() -> Result<()> {
 
     let matches = cli.get_matches();
 
-    let parsed_matches = (|| -> Result<&clap::ArgMatches> {
-        match matches.subcommand() {
-            ("daemon", Some(sub_app)) => {
-                if sub_app.is_present("start") {
-                    daemon::start_daemon(!sub_app.is_present("no_fork"))?;
-                }
-            },
-            ("config", Some(sub_app)) => {
-                if sub_app.is_present("print-default") {
-                    println!("{}", daemon::config::persistent::CONFIG_TEMPLATE);
-                }
-                else {
-                    return Ok( sub_app );
-                }
-            },
-            // match all
-            (_, subcommand) => {
-                // if there is a subcommand, return that
-                // otherwise, just return the base matches object
-                // -- this allows parsing of base-level arguments
-                return if let Some(subcommand) = subcommand {
-                    Ok( subcommand )
-                }
-                else {
-                    Ok( &matches )
-                }
+    let mut send_to_client = false;
+    match matches.subcommand() {
+        ("daemon", Some(sub_app)) => {
+            if sub_app.is_present("start") {
+                daemon::start_daemon(!sub_app.is_present("no_fork"))?;
             }
-        };
+        },
+        ("config", Some(sub_app)) => {
+            if sub_app.is_present("print-default") {
+                println!("{}", daemon::config::persistent::CONFIG_TEMPLATE);
+            }
+        },
+        // match all
+        (_, subcommand) => {
+            send_to_client = true;
+        }
+    };
 
-        std::process::exit(0);
-    })()?;
-
-    client::handle_input(parsed_matches)?;
+    if send_to_client {
+        client::handle_input(&matches)?;
+    }
 
     Ok(())
 }
