@@ -82,7 +82,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg config: -c --config "Returns the active configuration in use by the daemon")
             )
         )
-        (@arg configure_display: -c --("configure-display") conflicts_with[get] "Uses the current display configuration for future calls to BrightnessControl")
+        (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
             (visible_alias: "d")
