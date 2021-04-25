@@ -363,7 +363,8 @@ impl Daemon {
 
     async fn refresh_configuration(&mut self) -> Result<()> {
         // don't need the early return flag here
-        let _ = self.refresh_brightness().await?;
+        let _ = self.refresh_brightness_all().await?;
+
         if self.config.read().await.use_redshift {
             self.refresh_redshift().await?;
         }
@@ -400,7 +401,7 @@ impl Daemon {
                     }
                 }
                 // not using redshift, so refresh brightness to activate xrandr nightlight active
-                else if let Err(e) = self.refresh_brightness().await {
+                else if let Err(e) = self.refresh_brightness_all().await {
                     socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
                     break;
                 }
