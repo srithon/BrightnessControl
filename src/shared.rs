@@ -16,7 +16,7 @@ lazy_static! {
 
 pub const SOCKET_PATH: &str = "/tmp/brightness_control_socket.sock";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct BrightnessInput {
     pub brightness: Option<BrightnessChange>,
     pub override_fade: Option<bool>,
