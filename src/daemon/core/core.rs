@@ -250,9 +250,15 @@ impl Daemon {
         }
     }
 
+    async fn refresh_brightness_all(&self) -> Result<bool> {
+        self.refresh_brightness(
+            self.monitor_states.read().await.get_monitor_override_indices(&MonitorOverride::All).into_iter()
+        ).await
+    }
+
     // boolean signals whether the function removed any monitors from self.displays
-    async fn refresh_brightness(&self) -> Result<bool> {
-        let commands = self.create_xrandr_commands().await;
+    async fn refresh_brightness(&self, monitors: impl Iterator<Item=usize>) -> Result<bool> {
+        let commands = self.create_xrandr_commands(monitors).await;
         let auto_remove_displays = self.config.read().await.auto_remove_displays;
 
         if auto_remove_displays {
@@ -262,7 +268,7 @@ impl Daemon {
             // futures require a mutable reference to the underlying vector
             // therefore, the 2 iterators cannot coexist normally
             let enumerated_futures = {
-                let enumerated_futures = commands.into_iter().enumerate().filter_map(|(index, mut command)| {
+                let enumerated_futures = commands.into_iter().filter_map(|(index, mut command)| {
                     if let Ok(call_handle) = command.spawn() {
                         Some( (index, call_handle) )
                     }
@@ -282,6 +288,9 @@ impl Daemon {
                 enumerated_futures.iter().map(| ( index, _ ) | *index).rev()
             };
 
+            // we use FuturesOrdered because we want the output to line up with
+            // active_monitor_indices_iterator
+            // so we can identify the indices of the displays which threw an error
             let mut ordered_futures = {
                 let enumerated_futures = unsafe {
                     enumerated_futures.get().as_mut().unwrap()
@@ -302,8 +311,8 @@ impl Daemon {
                 // remove the monitor from "displays"
                 if !exit_status.success() {
                     // remove index'th display from list
-                    let mut displays_write_guard = self.displays.write().await;
-                    (*displays_write_guard).remove(index);
+                    let mut displays_write_guard = self.monitor_states.write().await;
+                    displays_write_guard.remove_enabled_monitor_by_index(&index);
 
                     removed_display = true;
                 }
@@ -313,7 +322,7 @@ impl Daemon {
         }
         else {
             // wait for it on its own
-            for mut command in commands {
+            for (_, mut command) in commands {
                 let call_handle = command.spawn()?;
                 tokio::spawn(call_handle);
             }
