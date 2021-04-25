@@ -524,6 +524,7 @@ impl Daemon {
 
         struct MonitorInfo<'a> {
             current_brightness: BrightnessGuard<'a>,
+            is_enabled: bool,
             is_fading: &'a Cell<bool>,
             brightness_change_info: BrightnessChangeInfo
         }
@@ -664,11 +665,16 @@ impl Daemon {
 
                 let total_brightness_shift = new_brightness - current_brightness;
 
-                let fade = {
+                let is_enabled = monitor_states_guard.is_monitor_index_enabled(monitor_index);
+
+                // don't waste time fading if the monitor isn't on
+                let fade = if is_enabled {
                     match &brightness_input.override_fade {
                         None => total_brightness_shift.abs() as u8 > fade_options.threshold,
                         Some(x) => *x
                     }
+                } else {
+                    false
                 };
 
                 let brightness_step = total_brightness_shift / (total_num_steps as f64);
@@ -676,6 +682,7 @@ impl Daemon {
                 let brightness_input_info = MonitorInfo {
                     // TODO verify that this works
                     current_brightness: guard.unwrap(),
+                    is_enabled,
                     is_fading: &brightness_state.is_fading,
                     brightness_change_info: BrightnessChangeInfo {
                         end_brightness: new_brightness,
