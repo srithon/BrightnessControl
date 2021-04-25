@@ -73,7 +73,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (@subcommand get => 
             (about: "Retrieves values from the daemon")
             (visible_alias: "g")
-            (@group action =>
+            (@group get_request =>
                 (@arg brightness: -b --brightness "Returns a newline-separated list of the brightness levels for all the connected displays OR all the monitors matched by the monitor override argument")
                 (@arg mode: -m --mode "Returns 1 if the nightlight is on and 0 if it is off")
                 (@arg displays: -d --displays "Returns a space-separated list of all the connected displays OR all the monitors matched by the monitor override argument")
