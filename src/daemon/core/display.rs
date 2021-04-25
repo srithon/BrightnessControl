@@ -290,7 +290,7 @@ impl CollectiveMonitorStateInternal {
         self.enabled_monitors.insert(index);
     }
 
-    fn monitor_is_enabled(&self, monitor_name: &str) -> bool {
+    pub fn is_monitor_name_enabled(&self, monitor_name: &str) -> bool {
         if let Some(index) = self.get_monitor_index_by_name(monitor_name) {
             self.enabled_monitors.contains(&index)
         }
