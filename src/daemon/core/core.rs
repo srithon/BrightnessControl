@@ -704,33 +704,39 @@ impl Daemon {
         Ok(())
     }
 
-    async fn create_xrandr_commands_with_brightness(&self, brightness_string: String) -> Vec<Command> {
+    async fn create_xrandr_commands(&self, monitors: impl Iterator<Item=usize>) -> Vec<(usize, Command)> {
         let config = self.config.read().await;
 
-        let (use_redshift, xrandr_gamma) = ( config.use_redshift, &config.nightlight_options.xrandr_gamma );
+        let monitor_states = self.monitor_states.read().await;
 
-        self.displays.read().await.iter().map(|display| {
+        let nightlight_on = self.mode.get();
+
+        monitors.map(move |monitor_state_index| {
+            // TODO safety
+            // filter_map instead?
+            let monitor_state = monitor_states.get_monitor_state_by_index(monitor_state_index).unwrap();
+
             let mut xrandr_call = Command::new("xrandr");
 
             xrandr_call.arg("--output");
-            xrandr_call.arg(&display.adapter_name);
+            xrandr_call.arg(monitor_state.get_monitor_name());
+
+            // TODO don't waste memory on another copy of the brightness
+            // maybe pass it in from the calling method?
+            let brightness_string = format!("{:.5}", monitor_state.brightness_state.get() / 100.0);
 
             xrandr_call.arg("--brightness")
-                .arg(&brightness_string);
+                .arg(brightness_string);
 
             // not using redshift AND nightlight on
-            if !use_redshift && self.mode.get() {
+            if !config.use_redshift && nightlight_on {
                 xrandr_call.arg("--gamma")
-                    .arg(xrandr_gamma);
+                    .arg(&config.nightlight_options.xrandr_gamma);
             }
 
-            xrandr_call
-        }).collect()
-    }
-
-    async fn create_xrandr_commands(&self) -> Vec<Command> {
-        let brightness_string = format!("{:.2}", self.brightness.get() / 100.0);
-        self.create_xrandr_commands_with_brightness(brightness_string).await
+            (monitor_state_index, xrandr_call)
+        })
+        .collect()
     }
 }
 
