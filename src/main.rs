@@ -23,34 +23,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         }
     };
 
-    let property_validator = |arg: String| {
-        const ERROR_MESSAGE: &str = "Valid options are [b]rightness, [c]onfiguration, [d]isplays, [m]ode, [a]ctive_display and [i]s_fading";
-
-        if arg.len() == 1 {
-            const CHARS: &[char] = &['b', 'c', 'd', 'm', 'a', 'i'];
-            let arg_char = arg.chars().next().unwrap();
-            let valid = CHARS.iter().any(|c| arg_char.eq_ignore_ascii_case(c));
-
-            if !valid {
-                Err(ERROR_MESSAGE.to_owned())
-            }
-            else {
-                Ok(())
-            }
-        }
-        else {
-            const OPTIONS: &[&str] = &["brightness", "configuration", "displays", "mode", "active_display", "is_fading"];
-            let valid = OPTIONS.iter().any(|prop| arg.eq_ignore_ascii_case(prop));
-
-            if !valid {
-                Err(ERROR_MESSAGE.to_owned())
-            }
-            else {
-                Ok(())
-            }
-        }
-    };
-
     clap_app!(BrightnessControl =>
         (@setting VersionlessSubcommands)
         (@setting ArgsNegateSubcommands)
@@ -99,7 +71,17 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
-        (@arg get: -g --get +takes_value value_name[property] {property_validator} "Gets the current value of the specified property: 'b[rightness] ([adapter name] | [active]) ', 'm[ode]', 'd[isplays]', [i]s_fading, [a]ctive_display or 'c[onfig]'")
+        (@subcommand get => 
+            (about: "Retrieves values from the daemon")
+            (visible_alias: "g")
+            (@group action =>
+                (@arg brightness: -b --brightness "Returns a newline-separated list of the brightness levels for all the connected displays OR all the monitors matched by the monitor override argument")
+                (@arg mode: -m --mode "Returns 1 if the nightlight is on and 0 if it is off")
+                (@arg displays: -d --displays "Returns a space-separated list of all the connected displays OR all the monitors matched by the monitor override argument")
+                (@arg fading: -f --fading "Returns a newline-separated list of all the connected displays OR all the monitors matched by the monitor override argument")
+                (@arg config: -c --config "Returns the active configuration in use by the daemon")
+            )
+        )
         (@arg configure_display: -c --("configure-display") conflicts_with[get] "Uses the current display configuration for future calls to BrightnessControl")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
