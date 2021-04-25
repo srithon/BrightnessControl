@@ -42,6 +42,7 @@ pub enum BrightnessChange {
 pub enum MonitorOverride {
     Specified { adapter_name: String },
     Active,
+    Enabled,
     All
 }
 
@@ -69,6 +70,7 @@ pub enum MonitorOverride {
 pub enum MonitorOverrideTOMLCompatible {
     Specified { adapter_name: String },
     Active,
+    Enabled,
     All
 }
 

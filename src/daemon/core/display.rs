@@ -353,6 +353,10 @@ impl CollectiveMonitorStateInternal {
     pub fn get_monitor_override_indices(&self, monitors: &MonitorOverride) -> Vec<usize> {
         match monitors {
             MonitorOverride::All => {
+                let iterator = self.iter_all_monitor_indices();
+                iterator.collect()
+            },
+            MonitorOverride::Enabled => {
                 let iterator = self.iter_enabled_monitor_indices();
                 iterator.collect()
             },

@@ -31,7 +31,8 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (@group monitor_override =>
             (@arg monitor: -m --monitor +takes_value value_name[ADAPTER_NAME] "Apply brightness changes to a specific display")
             (@arg active: --active "Apply brightness changes to the \"active\" monitor; note that this is \"active\" monitor is specific to BrightnessControl and has nothing to do with mouse location or keyboard focus")
-            (@arg all: -a --all "Apply brightness changes to ALL connected monitors")
+            (@arg enabled: -e --enabled "Apply brightness changes to all CONNECTED monitors")
+            (@arg all: -a --all "Apply brightness changes to ALL monitors")
         )
         (@subcommand brightness =>
             (about: "Holds commands involving brightness modification")

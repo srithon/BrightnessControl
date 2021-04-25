@@ -105,6 +105,9 @@ fn check_monitor_override(matches: &clap::ArgMatches) -> Option<MonitorOverride>
         else if matches.is_present("active") {
             MonitorOverride::Active
         }
+        else if matches.is_present("enabled") {
+            MonitorOverride::Enabled
+        }
         else {
             MonitorOverride::All
         };
