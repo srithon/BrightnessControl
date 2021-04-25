@@ -10,18 +10,18 @@ use std::io::{BufRead, BufReader};
 use crate::shared::*;
 
 fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverride>) -> Result<BrightnessInput> {
-    let brightness = {
-        if let Some(new_brightness) = matches.value_of("set") {
+    let res = if let Some(brightness_matches) = matches.subcommand_matches("brightness") {
+        let brightness_change = if let Some(new_brightness) = brightness_matches.value_of("set") {
             // unwrap because caller should be doing input validation
             Some(BrightnessChange::Set(new_brightness.parse::<u8>().unwrap()))
         }
         else {
             (|| {
                 let (num_string, multiplier) = {
-                    if let Some(brightness_shift) = matches.value_of("increment") {
+                    if let Some(brightness_shift) = brightness_matches.value_of("increment") {
                         (brightness_shift, 1)
                     }
-                    else if let Some(brightness_shift) = matches.value_of("decrement") {
+                    else if let Some(brightness_shift) = brightness_matches.value_of("decrement") {
                         (brightness_shift, -1)
                     }
                     else {
@@ -33,31 +33,33 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
 
                 Some(BrightnessChange::Adjustment(num * multiplier))
             })()
-        }
-    };
+        };
 
-    let override_fade = {
-        if matches.is_present("force_fade") {
-            Some(true)
-        }
-        else if matches.is_present("force_no_fade") {
-            Some(false)
-        }
-        else {
-            None
-        }
-    };
+        let override_fade = {
+            if matches.is_present("force_fade") {
+                Some(true)
+            }
+            else if matches.is_present("force_no_fade") {
+                Some(false)
+            }
+            else {
+                None
+            }
+        };
 
-    let terminate_fade = matches.is_present("terminate_fade");
+        let terminate_fade = matches.is_present("terminate_fade");
 
-    Ok(
         BrightnessInput {
-            brightness,
+            brightness: brightness_change,
             override_fade,
             override_monitor,
             terminate_fade
         }
-    )
+    } else {
+        BrightnessInput::default()
+    };
+
+    Ok(res)
 }
 
 fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<GetProperty> {
