@@ -729,7 +729,10 @@ impl Daemon {
             // dont want to reconfigure AGAIN
             // TODO consider doing this individually for each monitor
             // so that we can get different messages for each one
-            match self.refresh_brightness(to_not_fade.iter().map(|(&i, _)| i)).await {
+            //
+            // filter out disabled monitors when calling refresh_brightness, but not when printing
+            // out "set brightness"
+            match self.refresh_brightness(to_not_fade.iter().filter(|(_, monitor_info)| monitor_info.is_enabled).map(|(&i, _)| i)).await {
                 Ok(_) => {
                     for (brightness, adapter_name) in to_not_fade.into_iter().map(|(&i, monitor_info)| (monitor_info.brightness_change_info.end_brightness, monitor_states_guard.get_monitor_state_by_index(i).unwrap().get_monitor_name())) {
                         socket_message_holder.queue_success(format!("Set {} brightness to {}%\n", adapter_name, brightness));
