@@ -16,6 +16,8 @@ use super::config::{
     runtime::CachedState
 };
 
+use crate::shared::MonitorOverrideTOMLCompatible;
+
 pub type ConfigAttempt =  std::result::Result::<DaemonOptions, toml::de::Error>;
 
 pub struct FileUtils {
@@ -251,7 +253,14 @@ pub async fn get_configuration_from_file(configuration_file: &mut File) -> std::
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift, auto_remove_displays, fade_options, nightlight_options, monitor_default_behavior);
+    overwrite_values!(use_redshift, auto_remove_displays, fade_options, nightlight_options);
+
+    if let Some(monitor_default_behavior) = parsed_toml.get("monitor_default_behavior") {
+        // we have to hardcode this case because otherwise, it will attempt to directly parse it
+        // into a MonitorOverride rather than using the MonitorOverrideTOMLCompatible intermediate
+        // it will not understand the internal tag field and will fail to parse
+        config.monitor_default_behavior = monitor_default_behavior.clone().try_into::<MonitorOverrideTOMLCompatible>()?.into();
+    }
 
     Ok(config)
 }
