@@ -248,7 +248,7 @@ impl CollectiveMonitorStateInternal {
     }
 
     pub fn get_monitor_index_by_name(&self, name: &str) -> Option<&usize> {
-        self.monitor_names.get(name)
+        self.monitor_names.get(&name.to_ascii_lowercase())
     }
 
     pub fn get_active_monitor_index(&self) -> &usize {
@@ -257,7 +257,7 @@ impl CollectiveMonitorStateInternal {
 
     // returns Some(index) if the monitor was found, otherwise None
     fn overwrite_monitor_metadata(&mut self, monitor: Monitor) -> usize {
-        if let Some(&index) = self.get_monitor_index_by_name(&monitor.name().to_ascii_lowercase()) {
+        if let Some(&index) = self.get_monitor_index_by_name(&monitor.name()) {
             self.available_adapter_list.get_mut(index).unwrap().monitor_data.update_metadata(monitor.monitor_metadata);
             index
         }
@@ -340,7 +340,7 @@ impl CollectiveMonitorStateInternal {
                         // TODO remove this copy
                         // either do it in-place (mutably) or sanitize the input beforehand by
                         // making it lowercase
-                        self.get_monitor_index_by_name(&adapter_name.to_ascii_lowercase())
+                        self.get_monitor_index_by_name(&adapter_name)
                     },
                     MonitorOverride::Active => {
                         Some(self.get_active_monitor_index())
@@ -374,7 +374,7 @@ impl CollectiveMonitorStateInternal {
                         // TODO remove this copy
                         // either do it in-place (mutably) or sanitize the input beforehand by
                         // making it lowercase
-                        self.get_monitor_index_by_name(&adapter_name.to_ascii_lowercase())
+                        self.get_monitor_index_by_name(&adapter_name)
                     },
                     MonitorOverride::Active => {
                         Some(self.get_active_monitor_index())
