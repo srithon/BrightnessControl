@@ -17,9 +17,11 @@ pub type BrightnessGuard<'a> = MutexGuardRefWrapper<'a, f64, mpsc::UnboundedRece
 
 #[derive(Serialize, Deserialize)]
 pub struct CachedState {
-    pub brightness_states: FnvHashMap<String, f64>,
     pub nightlight: bool,
-    pub active_monitor: usize
+    pub active_monitor: usize,
+    // in TOML, tables need to be serialized at the END
+    // otherwise the other fields look like they are part of the table
+    pub brightness_states: FnvHashMap<String, f64>
 }
 
 impl Default for CachedState {
