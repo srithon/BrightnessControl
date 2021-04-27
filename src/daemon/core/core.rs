@@ -177,8 +177,10 @@ impl Daemon {
             let configuration: DaemonOptions = async move {
                 // file exists
                 if file_existed {
-                    if let Ok(config) = get_configuration_from_file(&mut config_file).await {
-                        return Ok(config);
+                    match get_configuration_from_file(&mut config_file).await {
+                        Err(e) => eprintln!("Error getting configuration from file (initial): {}", e),
+                        // rewrapping Result with different Err type
+                        Ok(c) => return Ok(c)
                     }
                 }
                 else {
