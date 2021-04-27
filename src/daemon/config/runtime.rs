@@ -36,7 +36,7 @@ impl Default for CachedState {
 
 impl CachedState {
     pub fn validate(&self) -> bool {
-        self.brightness_states.iter().all(|(_, &brightness)| brightness >= 0.0 && brightness <= 1.0)
+        self.brightness_states.iter().all(|(_, &brightness)| brightness >= 0.0 && brightness <= 100.0)
     }
 }
 
