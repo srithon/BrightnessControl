@@ -125,7 +125,7 @@ impl FileUtils {
                 cache_file.write_all(&serialized_toml).await?
             },
             Err(e) => {
-                eprintln!("Failed to serialize cached state.");
+                eprintln!("Failed to serialize cached state: {}", e);
                 return Err(std::io::Error::new(ErrorKind::Other, format!("{}", e)));
             }
         };
