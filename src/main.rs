@@ -110,6 +110,9 @@ fn main() -> Result<()> {
             if sub_app.is_present("print-default") {
                 println!("{}", daemon::config::persistent::CONFIG_TEMPLATE);
             }
+            else {
+                send_to_client = true;
+            }
         },
         // match all
         (_, subcommand) => {
