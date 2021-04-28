@@ -154,13 +154,14 @@ fn check_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
     None
 }
 
-fn check_toggle_nightlight(matches: &clap::ArgMatches) -> Option<ProgramInput> {
-    if matches.is_present("toggle_nightlight") {
-        Some(ProgramInput::ToggleNightlight)
+fn check_nightlight(matches: &clap::ArgMatches) -> Option<ProgramInput> {
+    if let Some(nightlight_matches) = matches.subcommand_matches("nightlight") {
+        if nightlight_matches.is_present("toggle_nightlight") {
+            return Some(ProgramInput::ToggleNightlight)
+        }
     }
-    else {
-        None
-    }
+
+    None
 }
 
 pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
@@ -187,7 +188,7 @@ pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
         check_get_property(&matches, &monitor_override),
         check_brightness(&matches, monitor_override),
         check_configuration(&matches),
-        check_toggle_nightlight(&matches),
+        check_nightlight(&matches),
         check_monitor_subcommand(&matches)
     }
 
