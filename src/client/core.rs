@@ -127,7 +127,7 @@ fn check_monitor_subcommand(matches: &clap::ArgMatches) -> bool {
     false
 }
 
-fn check_reload_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
+fn check_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
     if let Some(config_matches) = matches.subcommand_matches("config") {
         if config_matches.is_present("reload_configuration") {
             return Some(ProgramInput::ConfigureDisplay)
@@ -178,7 +178,7 @@ pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
     return_first_some! {
         check_get_property(&matches, &monitor_override),
         check_brightness(&matches, monitor_override),
-        check_reload_configuration(&matches),
+        check_configuration(&matches),
         check_configure_display(&matches),
         check_toggle_nightlight(&matches)
     }
