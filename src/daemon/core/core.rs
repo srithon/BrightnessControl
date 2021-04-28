@@ -369,143 +369,134 @@ impl Daemon {
     }
 
     async fn process_input(&mut self, program_input: ProgramInput, mut socket_holder: SocketMessageHolder) -> ProcessInputExitCode {
-        // avoided using destructuring because destructuring relies entirely on the order of the
-        // struct elements
-        let brightness_change = program_input.brightness;
-        let get_property = program_input.get_property;
-        let toggle_nightlight = program_input.toggle_nightlight;
-        let configure_display = program_input.configure_display;
-        let reload_configuration = program_input.reload_configuration;
-        let shutdown = program_input.shutdown;
+        match program_input {
+            ProgramInput::ToggleNightlight => {
+                self.mode.set_value(!self.mode.get()).await;
 
-        if toggle_nightlight {
-            self.mode.set_value(!self.mode.get()).await;
-
-            // janky alternative to an async closure
-            // this allows us to early-return from this block
-            // can't use a regular closure because then we wouldnt be able to use async/await
-            // inside of it
-            // can't use an async block inside of a regular one because then we would need to move all the
-            // captured variables into the block
-            // this is ugly but it works
-            #[allow(clippy::never_loop)]
-            loop {
-                if self.config.read().await.use_redshift {
-                    if let Err(e) = self.refresh_redshift().await {
-                        socket_holder.queue_error(format!("Failed to refresh redshift: {}", e));
+                // janky alternative to an async closure
+                // this allows us to early-return from this block
+                // can't use a regular closure because then we wouldnt be able to use async/await
+                // inside of it
+                // can't use an async block inside of a regular one because then we would need to move all the
+                // captured variables into the block
+                // this is ugly but it works
+                #[allow(clippy::never_loop)]
+                loop {
+                    if self.config.read().await.use_redshift {
+                        if let Err(e) = self.refresh_redshift().await {
+                            socket_holder.queue_error(format!("Failed to refresh redshift: {}", e));
+                            break;
+                        }
+                    }
+                    // not using redshift, so refresh brightness to activate xrandr nightlight active
+                    else if let Err(e) = self.refresh_brightness_all().await {
+                        socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
                         break;
                     }
-                }
-                // not using redshift, so refresh brightness to activate xrandr nightlight active
-                else if let Err(e) = self.refresh_brightness_all().await {
-                    socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
-                    break;
-                }
 
-                // could have used format! to make this a one-liner, but this allows the strings to be
-                // stored in static memory instead of having to be generated at runtime
-                if self.mode.get() {
-                    socket_holder.queue_success("Enabled nightlight");
+                    // could have used format! to make this a one-liner, but this allows the strings to be
+                    // stored in static memory instead of having to be generated at runtime
+                    if self.mode.get() {
+                        socket_holder.queue_success("Enabled nightlight");
+                    }
+                    else {
+                        socket_holder.queue_success("Disabled nightlight");
+                    }
+
+                    break;
+                };
+            },
+            ProgramInput::Get(property) => {
+                // TODO create macro that yields an iterator over MonitorState's
+                let property_value = match property {
+                    GetProperty::Brightness(optional_monitor_override) => {
+                        self.monitor_states.get_formatted_display_states(optional_monitor_override.as_ref()).await
+                    },
+                    GetProperty::Displays => {
+                        // TODO take a MonitorOverride for this one too
+                        self.monitor_states.get_formatted_display_names(Some(&MonitorOverride::All)).await
+                    },
+                    GetProperty::Mode => {
+                        format!("{}", self.mode.get() as i32)
+                    },
+                    GetProperty::Config => {
+                        format!("{:?}", *self.config.read().await)
+                    },
+                    GetProperty::IsFading(optional_monitor_override) => {
+                        // return "1" if currently fading
+                        // else "0"
+                        self.monitor_states.get_formatted_display_states_with_format(optional_monitor_override.as_ref(), |monitor_state| {
+                            let is_fading = monitor_state.brightness_state.is_fading.get();
+
+                            if is_fading {
+                                "1"
+                            }
+                            else {
+                                "0"
+                            }
+                        }).await
+                    },
+                    GetProperty::ActiveMonitor => {
+                        let monitors = self.monitor_states.read().await;
+                        let active_index = *monitors.get_active_monitor_index();
+                        let active_monitor_state = monitors.get_monitor_state_by_index(active_index).unwrap();
+                        format!("{}", active_monitor_state.get_monitor_name())
+                    }
+                };
+
+                socket_holder.queue_success(property_value);
+            },
+            ProgramInput::ConfigureDisplay => {
+                if let Err(e) = self.reconfigure_displays().await {
+                    socket_holder.queue_error(format!("Failed to reconfigure displays: {}", e));
                 }
                 else {
-                    socket_holder.queue_success("Disabled nightlight");
+                    socket_holder.queue_success("Successfully reconfigured displays!");
+                }
+            },
+            ProgramInput::ReloadConfiguration => {
+                match self.file_utils.open_configuration_file().await {
+                    Ok( (mut configuration_file, _) ) => {
+                        let config_result = get_configuration_from_file(&mut configuration_file);
+
+                        match config_result.await {
+                            std::result::Result::<DaemonOptions, toml::de::Error>::Ok(config) => {
+                                *self.config.write().await = config;
+
+                                socket_holder.queue_success("Successfully reloaded configuration!");
+                            }
+                            Err(error) => {
+                                socket_holder.queue_error(format!("Failed to parse configuration file: {}", error));
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        socket_holder.queue_error(format!("Failed to open configuration file for reloading: {}", e));
+                    }
+                }
+            },
+            ProgramInput::Shutdown => {
+                if let Err(e) = self.save_configuration().await {
+                    socket_holder.queue_error(format!("Failed to save configuration: {}", e));
+                }
+                else {
+                    socket_holder.queue_success("Successfully saved configuration!");
                 }
 
-                break;
-            };
-        }
+                return ProcessInputExitCode::Shutdown;
+            },
+            ProgramInput::Brightness(brightness_change) => {
+                if brightness_change.is_active() {
+                    // let process_brightness_input handle the socket holder
+                    self.process_brightness_input(brightness_change, socket_holder).await;
 
-        if let Some(property) = get_property {
-            // TODO create macro that yields an iterator over MonitorState's
-            let property_value = match property {
-                GetProperty::Brightness(optional_monitor_override) => {
-                    self.monitor_states.get_formatted_display_states(optional_monitor_override.as_ref()).await
-                },
-                GetProperty::Displays => {
-                    // TODO take a MonitorOverride for this one too
-                    self.monitor_states.get_formatted_display_names(Some(&MonitorOverride::All)).await
-                },
-                GetProperty::Mode => {
-                    format!("{}", self.mode.get() as i32)
-                },
-                GetProperty::Config => {
-                    format!("{:?}", *self.config.read().await)
-                },
-                GetProperty::IsFading(optional_monitor_override) => {
-                    // return "1" if currently fading
-                    // else "0"
-                    self.monitor_states.get_formatted_display_states_with_format(optional_monitor_override.as_ref(), |monitor_state| {
-                        let is_fading = monitor_state.brightness_state.is_fading.get();
-
-                        if is_fading {
-                            "1"
-                        }
-                        else {
-                            "0"
-                        }
-                    }).await
-                },
-                GetProperty::ActiveMonitor => {
-                    let monitors = self.monitor_states.read().await;
-                    let active_index = *monitors.get_active_monitor_index();
-                    let active_monitor_state = monitors.get_monitor_state_by_index(active_index).unwrap();
-                    format!("{}", active_monitor_state.get_monitor_name())
+                    // early return so we don't double-move the socket holder
+                    return ProcessInputExitCode::Normal;
                 }
-            };
-
-            socket_holder.queue_success(property_value);
+            }
         };
 
-        if configure_display {
-            if let Err(e) = self.reconfigure_displays().await {
-                socket_holder.queue_error(format!("Failed to reconfigure displays: {}", e));
-            }
-            else {
-                socket_holder.queue_success("Successfully reconfigured displays!");
-            }
-        }
-
-        if reload_configuration {
-            match self.file_utils.open_configuration_file().await {
-                Ok( (mut configuration_file, _) ) => {
-                    let config_result = get_configuration_from_file(&mut configuration_file);
-
-                    match config_result.await {
-                        std::result::Result::<DaemonOptions, toml::de::Error>::Ok(config) => {
-                            *self.config.write().await = config;
-
-                            socket_holder.queue_success("Successfully reloaded configuration!");
-                        }
-                        Err(error) => {
-                            socket_holder.queue_error(format!("Failed to parse configuration file: {}", error));
-                        }
-                    }
-                },
-                Err(e) => {
-                    socket_holder.queue_error(format!("Failed to open configuration file for reloading: {}", e));
-                }
-            }
-        }
-
-        if shutdown {
-            if let Err(e) = self.save_configuration().await {
-                socket_holder.queue_error(format!("Failed to save configuration: {}", e));
-            }
-            else {
-                socket_holder.queue_success("Successfully saved configuration!");
-            }
-
-            return ProcessInputExitCode::Shutdown;
-        }
-
-        if brightness_change.is_active() {
-            // let process_brightness_input handle the socket holder
-            self.process_brightness_input(brightness_change, socket_holder).await;
-        }
-        else {
-            // otherwise, consume it here
-            socket_holder.consume();
-        }
+        socket_holder.consume();
 
         ProcessInputExitCode::Normal
     }
@@ -898,19 +889,7 @@ fn register_sigterm_handler() -> Result<()> {
                 // SEND INPUT TO DAEMON
                 match std::os::unix::net::UnixStream::connect(SOCKET_PATH) {
                     Ok(mut sock) => {
-                        let mock_save_daemon_input = ProgramInput {
-                            brightness: BrightnessInput {
-                                brightness: None,
-                                override_fade: None,
-                                override_monitor: None,
-                                terminate_fade: false
-                            },
-                            get_property: None,
-                            toggle_nightlight: false,
-                            configure_display: false,
-                            reload_configuration: false,
-                            shutdown: true,
-                        };
+                        let mock_save_daemon_input = ProgramInput::Shutdown;
 
                         if let Ok(binary_encoded_input) = BINCODE_OPTIONS.serialize(&mock_save_daemon_input) {
                             let write_result = sock.write_all(&binary_encoded_input);

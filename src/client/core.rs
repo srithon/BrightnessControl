@@ -9,8 +9,8 @@ use std::io::{BufRead, BufReader};
 
 use crate::shared::*;
 
-fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverride>) -> BrightnessInput {
-    if let Some(brightness_matches) = matches.subcommand_matches("brightness") {
+fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverride>) -> Option<ProgramInput> {
+    let optional_brightness_input = if let Some(brightness_matches) = matches.subcommand_matches("brightness") {
         let brightness_change = if let Some(new_brightness) = brightness_matches.value_of("set") {
             // unwrap because caller should be doing input validation
             Some(BrightnessChange::Set(new_brightness.parse::<u8>().unwrap()))
@@ -49,18 +49,22 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
 
         let terminate_fade = matches.is_present("terminate_fade");
 
-        BrightnessInput {
-            brightness: brightness_change,
-            override_fade,
-            override_monitor,
-            terminate_fade
-        }
+        Some(
+            BrightnessInput {
+                brightness: brightness_change,
+                override_fade,
+                override_monitor,
+                terminate_fade
+            }
+        )
     } else {
-        BrightnessInput::default()
-    }
+        None
+    };
+
+    optional_brightness_input.map(|brightness_input| ProgramInput::Brightness(brightness_input))
 }
 
-fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<GetProperty> {
+fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<ProgramInput> {
     if let Some(get_subcommand) = matches.subcommand_matches("get") {
         let present = |name| {
             get_subcommand.is_present(name)
@@ -86,7 +90,7 @@ fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOve
                 unreachable!("Invalid get argument")
             };
 
-            Some(res)
+            Some(ProgramInput::Get(res))
         }
         else {
             None
@@ -119,19 +123,71 @@ fn check_monitor_override(matches: &clap::ArgMatches) -> Option<MonitorOverride>
     }
 }
 
-pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
-    let monitor_override = check_monitor_override(&matches);
-    let get_property = check_get_property(&matches, &monitor_override);
-    let brightness_subcommand = check_brightness(&matches, monitor_override);
+fn check_monitor_subcommand(matches: &clap::ArgMatches) -> bool {
+    false
+}
 
-    let program_input = ProgramInput::new(
-        brightness_subcommand,
-        get_property,
-        matches.is_present("configure_display"),
-        matches.is_present("toggle_nightlight"),
-        matches.is_present("reload_configuration"),
-        false,
-    );
+fn check_reload_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
+    if let Some(config_matches) = matches.subcommand_matches("config") {
+        if config_matches.is_present("reload_configuration") {
+            return Some(ProgramInput::ConfigureDisplay)
+        }
+    }
+
+    None
+}
+
+fn check_configure_display(matches: &clap::ArgMatches) -> Option<ProgramInput> {
+    if matches.is_present("configure_display") {
+        Some(ProgramInput::ConfigureDisplay)
+    }
+    else {
+        None
+    }
+}
+
+fn check_toggle_nightlight(matches: &clap::ArgMatches) -> Option<ProgramInput> {
+    if matches.is_present("toggle_nightlight") {
+        Some(ProgramInput::ToggleNightlight)
+    }
+    else {
+        None
+    }
+}
+
+pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
+    let monitor_override = check_monitor_override(&matches);
+
+    // recursive macro that goes through each expression in a list and returns the inner value of
+    // the first that has one
+    // this is a lazily-evaluated alternative to vec![...].first(|x| x.is_some()).expect("Invalid
+    // input");
+    macro_rules! return_first_some {
+        ($optional:expr) => {{
+            if let Some(value) = $optional {
+                return value;
+            }
+        }};
+
+        ($optional:expr, $($xs:expr),+) => {{
+            return_first_some!($optional);
+            return_first_some!($($xs),+)
+        }};
+    }
+
+    return_first_some! {
+        check_get_property(&matches, &monitor_override),
+        check_brightness(&matches, monitor_override),
+        check_reload_configuration(&matches),
+        check_configure_display(&matches),
+        check_toggle_nightlight(&matches)
+    }
+
+    unreachable!("Invalid input resulted in no ProgramInput")
+}
+
+pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
+    let program_input = get_program_input(matches);
 
     // SEND INPUT TO DAEMON
     let mut socket = match UnixStream::connect(SOCKET_PATH) {

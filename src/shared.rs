@@ -85,34 +85,11 @@ pub enum GetProperty {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ProgramInput {
-    pub brightness: BrightnessInput,
-    pub get_property: Option<GetProperty>,
-    pub configure_display: bool,
-    pub toggle_nightlight: bool,
-    pub reload_configuration: bool,
-    pub shutdown: bool
-}
-
-impl ProgramInput {
-    pub fn new(brightness: BrightnessInput, get_property: Option<GetProperty>, configure_display: bool, toggle_nightlight: bool, reload_configuration: bool, shutdown: bool) -> ProgramInput {
-        ProgramInput {
-            brightness,
-            get_property,
-            configure_display,
-            toggle_nightlight,
-            reload_configuration,
-            shutdown,
-        }
-    }
-
-    pub fn returns_feedback(&self) -> bool {
-        // create a vector of all options that send back feedback to the client
-        let feedback_returning_options = vec![
-            self.reload_configuration
-        ];
-
-        // returns true if any of them are true
-        feedback_returning_options.iter().any(|&b| b)
-    }
+pub enum ProgramInput {
+    Brightness(BrightnessInput),
+    Get(GetProperty),
+    ConfigureDisplay,
+    ToggleNightlight,
+    ReloadConfiguration,
+    Shutdown
 }
