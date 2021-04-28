@@ -251,6 +251,38 @@ impl CollectiveMonitorStateInternal {
         self.monitor_names.get(&name.to_ascii_lowercase())
     }
 
+    pub fn set_active_monitor_by_name(&mut self, new_active_monitor_name: &str) -> std::result::Result<(), &str> {
+        match self.get_monitor_index_by_name(new_active_monitor_name) {
+            // TODO use better errors here
+            Some(&index) => {
+                if self.is_monitor_index_enabled(index) {
+                    self.active_monitor = index;
+                    Ok(())
+                }
+                else {
+                    Err("Requested monitor is disabled!")
+                }
+            },
+            None => Err("Requested monitor does not exist!")
+        }
+    }
+
+    // NOTE if we dont specify that the str in the return type is static, we will get lifetime
+    // issues because the borrow checker will think that the str lifetime is tied to that of 'self'
+    pub fn set_active_monitor_by_index(&mut self, new_active_monitor_index: usize) -> std::result::Result<(), &'static str> {
+        // if the index is greater than or equal to the length of the adapter list, it is out of bounds
+        if self.available_adapter_list.len() <= new_active_monitor_index {
+            return Err("Specified index does not exist!");
+        }
+        else if !self.is_monitor_index_enabled(new_active_monitor_index) {
+            return Err("Specified monitor is not enabled!");
+        }
+        else {
+            self.active_monitor = new_active_monitor_index;
+            Ok(())
+        }
+    }
+
     pub fn get_active_monitor_index(&self) -> &usize {
         &self.active_monitor
     }
