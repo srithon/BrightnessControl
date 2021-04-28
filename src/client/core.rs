@@ -123,8 +123,22 @@ fn check_monitor_override(matches: &clap::ArgMatches) -> Option<MonitorOverride>
     }
 }
 
-fn check_monitor_subcommand(matches: &clap::ArgMatches) -> bool {
-    false
+fn check_monitor_subcommand(matches: &clap::ArgMatches) -> Option<ProgramInput> {
+    if let Some(monitor_matches) = matches.subcommand_matches("monitors") {
+        // check the ArgGroup as a whole
+        if monitor_matches.is_present("active_change") {
+            let active_change = if let Some(new_monitor) = monitor_matches.value_of("set_active") {
+                ActiveMonitorChange::SetActive(new_monitor.to_string())
+            }
+            else {
+                unreachable!("active_change present but no argument matched")
+            };
+
+            return Some(ProgramInput::ChangeActiveMonitor(active_change))
+        }
+    }
+
+    None
 }
 
 fn check_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
@@ -180,7 +194,8 @@ pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
         check_brightness(&matches, monitor_override),
         check_configuration(&matches),
         check_configure_display(&matches),
-        check_toggle_nightlight(&matches)
+        check_toggle_nightlight(&matches),
+        check_monitor_subcommand(&matches)
     }
 
     unreachable!("Invalid input resulted in no ProgramInput")

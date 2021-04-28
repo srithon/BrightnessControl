@@ -51,7 +51,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
         (@subcommand monitors =>
             (about: "Holds commands that control BrightnessControl behavior for multiple monitors")
             (visible_alias: "m")
-            (@group action =>
+            (@group active_change =>
                 (@arg set_active: -s --("set-active") +takes_value value_name[monitor_adapter_name] "Sets the active monitor for use with \"brightness --active\"; use \"get --displays\" to see options")
             )
         )

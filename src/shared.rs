@@ -85,9 +85,17 @@ pub enum GetProperty {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum ActiveMonitorChange {
+    /// The String field can be either a string representation of the adapter index OR the name of
+    /// the adapter
+    SetActive(String)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ProgramInput {
     Brightness(BrightnessInput),
     Get(GetProperty),
+    ChangeActiveMonitor(ActiveMonitorChange),
     ConfigureDisplay,
     ToggleNightlight,
     ReloadConfiguration,

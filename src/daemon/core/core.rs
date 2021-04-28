@@ -493,6 +493,37 @@ impl Daemon {
                     // early return so we don't double-move the socket holder
                     return ProcessInputExitCode::Normal;
                 }
+            },
+            ProgramInput::ChangeActiveMonitor(active_monitor_change) => {
+                match active_monitor_change {
+                    ActiveMonitorChange::SetActive(new_monitor) => {
+                        let mut monitor_states_guard = self.monitor_states.write().await;
+
+                        // Result<monitor_name: &String, error_message: &'static str>
+                        let result = {
+                            if let Ok(index) = new_monitor.parse::<usize>() {
+                                let result = monitor_states_guard.set_active_monitor_by_index(index);
+
+                                // if set_active_monitor_by_index is successful, set the thing to
+                                // the name of the thing
+                                result.map(|_| monitor_states_guard.get_monitor_state_by_index(index).expect("Monitor state is None even though it was just set to the active monitor").get_monitor_name())
+                            }
+                            else {
+                                let result = monitor_states_guard.set_active_monitor_by_name(&new_monitor);
+                                result.map(|_| &new_monitor)
+                            }
+                        };
+
+                        match result {
+                            Ok(monitor_name) => {
+                                socket_holder.queue_success(format!("Set active monitor to {}!", monitor_name))
+                            }
+                            Err(message) => {
+                                socket_holder.queue_error(message)
+                            }
+                        }
+                    }
+                }
             }
         };
 
