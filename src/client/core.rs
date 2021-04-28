@@ -136,6 +136,9 @@ fn check_monitor_subcommand(matches: &clap::ArgMatches) -> Option<ProgramInput> 
 
             return Some(ProgramInput::ChangeActiveMonitor(active_change))
         }
+        else if monitor_matches.is_present("reconfigure_displays") {
+            return Some(ProgramInput::ConfigureDisplay)
+        }
     }
 
     None
@@ -149,15 +152,6 @@ fn check_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
     }
 
     None
-}
-
-fn check_configure_display(matches: &clap::ArgMatches) -> Option<ProgramInput> {
-    if matches.is_present("configure_display") {
-        Some(ProgramInput::ConfigureDisplay)
-    }
-    else {
-        None
-    }
 }
 
 fn check_toggle_nightlight(matches: &clap::ArgMatches) -> Option<ProgramInput> {
@@ -193,7 +187,6 @@ pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
         check_get_property(&matches, &monitor_override),
         check_brightness(&matches, monitor_override),
         check_configuration(&matches),
-        check_configure_display(&matches),
         check_toggle_nightlight(&matches),
         check_monitor_subcommand(&matches)
     }

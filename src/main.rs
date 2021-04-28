@@ -52,7 +52,11 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
             (about: "Holds commands that control BrightnessControl behavior for multiple monitors")
             (visible_alias: "m")
             (@group active_change =>
+                (@attributes conflicts_with[action])
                 (@arg set_active: -s --("set-active") +takes_value value_name[monitor_adapter_name] "Sets the active monitor for use with \"brightness --active\"; use \"get --displays\" to see options")
+            )
+            (@group action =>
+                (@arg reconfigure_displays: -r --("reconfigure-displays") "Uses the current display configuration for future calls to BrightnessControl")
             )
         )
         (@subcommand nightlight =>
@@ -82,7 +86,6 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg config: -c --config "Returns the active configuration in use by the daemon")
             )
         )
-        (@arg configure_display: -c --("configure-display") "Uses the current display configuration for future calls to BrightnessControl")
         (@subcommand daemon =>
             (about: "Holds commands relating to the daemon lifecycle")
             (visible_alias: "d")
