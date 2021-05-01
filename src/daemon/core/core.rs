@@ -925,6 +925,11 @@ impl Daemon {
 
                 // reset fading back to false
                 set_fading_status!(false);
+
+                for (&monitor_index, monitor_info) in to_fade {
+                    let monitor_name = monitor_states_guard.get_monitor_state_by_index(monitor_index).unwrap().get_monitor_name();
+                    socket_message_holder.queue_success(format!("{}: {}", monitor_name, monitor_info.brightness_change_info.end_brightness));
+                }
             }
 
             // send messages to client
