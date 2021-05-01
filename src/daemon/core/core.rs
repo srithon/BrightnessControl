@@ -812,7 +812,7 @@ impl Daemon {
             match self.refresh_brightness(to_not_fade.iter().filter(|(_, monitor_info)| monitor_info.is_enabled).map(|(&i, _)| i), auto_remove_displays).await {
                 Ok(_) => {
                     for (brightness, adapter_name) in to_not_fade.into_iter().map(|(&i, monitor_info)| (monitor_info.brightness_change_info.end_brightness, monitor_states_guard.get_monitor_state_by_index(i).unwrap().get_monitor_name())) {
-                        socket_message_holder.queue_success(format!("Set {} brightness to {}%\n", adapter_name, brightness));
+                        socket_message_holder.queue_success(format!("{}: {}", adapter_name, brightness));
                     }
                     // socket_message_holder.queue_success(format!("Successfully modified brightness"));
                 },
