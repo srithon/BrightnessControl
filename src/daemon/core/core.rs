@@ -918,6 +918,9 @@ impl Daemon {
                 };
             }
 
+            // reset fading back to false
+            set_fading_status!(false);
+
             // send messages to client
             socket_message_holder.consume();
         }
