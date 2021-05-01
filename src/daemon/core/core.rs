@@ -623,18 +623,32 @@ impl Daemon {
                 }
             }
 
-            let optional_guards: Vec<Option<BrightnessGuard>> = relevant_monitor_indices
+            let optional_guards: Vec<(usize, Option<BrightnessGuard>)> = relevant_monitor_indices
                 .iter()
-                .map(|&index| monitor_states_guard
-                    .get_monitor_state_by_index(index)
-                    .expect("monitor state not in vector")
-                    .get_brightness_state()
-                    .try_lock_brightness()
+                .map(|monitor_index|
+                    (
+                        monitor_index,
+                        intermediate_brightness_states.get(monitor_index)
+                    )
+                )
+                // take only the ones not present in intermediate_brightness_states
+                .filter(|(_, optional_monitor_info)| optional_monitor_info.is_none())
+                // try to take the brightness guard from monitor_states_guard
+                .map(|(&index, _)|
+                    (
+                        index,
+                        monitor_states_guard
+                            .get_monitor_state_by_index(index)
+                            .expect("monitor state not in vector")
+                            .get_brightness_state()
+                            .try_lock_brightness()
+                    )
                 ).collect();
 
             // TODO make this random so there is no preference towards those in the beginning of
             // the list
-            let first_none_guard_index = optional_guards.iter().position(|x| x.is_none());
+            // this finds the first brightness guard that we could not secure
+            let first_none_guard_index = optional_guards.iter().find(|(_, monitor_info)| monitor_info.is_none()).map(|(i, _)| *i);
 
             if let Some(index) = first_none_guard_index {
                 // pass everything along to the owner of the receiver
@@ -659,6 +673,43 @@ impl Daemon {
                 return;
             }
 
+            // this inserts everything in optional_guards into intermediate_brightness_states
+            // later on, we update the brightness_change_info for each one according to the input
+            for (monitor_index, guard) in optional_guards {
+                // we made sure they were all Some using first_none_guard_index
+                let guard = guard.unwrap();
+
+                let brightness_state = monitor_states_guard.get_monitor_state_by_index(monitor_index).expect("monitor state index not found").get_brightness_state();
+
+                // we do not need to put meaningless default values into the BrightnessChangeInfo
+                // that we insert
+                // instead, we set it equal to uninitialized memory
+                // we need to refresh the field values in the following loop
+                // it doesn't make sense to do it here as well
+                macro_rules! garbage {
+                    () => {{
+                        unsafe { std::mem::MaybeUninit::<_>::uninit().assume_init() }
+                    }}
+                }
+
+                // we initialize the current_brightness and is_fading fields because all of the other ones
+                // will be overwritten
+                // is_fading contains a REFERENCE to monitor_states_guard, so we do not need to
+                // update it after its initial initialization
+                // therefore, we can initialize it here and write to it again
+                let partially_initialized_monitor_info = MonitorInfo {
+                    current_brightness: guard,
+                    is_fading: &brightness_state.is_fading,
+
+                    // GARBAGE DEFAULT VALUES
+                    is_enabled: garbage!(),
+                    brightness_change_info: garbage!()
+                };
+
+                // add each one to intermediate_brightness_states
+                intermediate_brightness_states.insert(monitor_index, partially_initialized_monitor_info);
+            }
+
             // TODO don't clone this
             let fade_options = &self.config.read().await.fade_options.clone();
 
@@ -666,13 +717,12 @@ impl Daemon {
             let total_num_steps = fade_options.total_duration / fade_options.step_duration;
 
             // populate intermediate_brightness_states with current brightnesses
-            optional_guards.into_iter().enumerate().for_each(|(i, guard)| {
-                let monitor_index = relevant_monitor_indices[i];
-                // intermediate_brightness_states.insert(monitor_index, guard.unwrap().get());
+            intermediate_brightness_states.iter_mut().for_each(|(&monitor_index, monitor_info)| {
+                println!("Iterating intermediate_brightness_states! {}", monitor_index);
 
-                let brightness_state = monitor_states_guard.get_monitor_state_by_index(monitor_index).expect("monitor state index not found").get_brightness_state();
+                let brightness_guard = &monitor_info.current_brightness;
 
-                let current_brightness = guard.as_ref().unwrap().get();
+                let current_brightness = brightness_guard.get();
 
                 let new_brightness = {
                     let integer_representation = match brightness_input.brightness {
@@ -702,19 +752,22 @@ impl Daemon {
 
                 let brightness_step = total_brightness_shift / (total_num_steps as f64);
 
-                let brightness_input_info = MonitorInfo {
-                    // TODO verify that this works
-                    current_brightness: guard.unwrap(),
-                    is_enabled,
-                    is_fading: &brightness_state.is_fading,
-                    brightness_change_info: BrightnessChangeInfo {
-                        end_brightness: new_brightness,
-                        brightness_step,
-                        fade
-                    }
+                let brightness_change_info = BrightnessChangeInfo {
+                    end_brightness: new_brightness,
+                    brightness_step,
+                    fade
                 };
 
-                intermediate_brightness_states.insert(monitor_index, brightness_input_info);
+                // these fields are not references, so we can drop them uninitialized without
+                // worrying about a panic
+                // previously, we had to use std::mem::addr_of_mut and write_unaligned to write
+                // directly to the struct field addresses without dropping the old values
+                // however, this is only necessary for pointers
+                // now that is_fading (which is a reference) is not uninitialized in the
+                // beginning, we never have to write to raw pointers and can instead write normally
+                // like this
+                monitor_info.brightness_change_info = brightness_change_info;
+                monitor_info.is_enabled = is_enabled;
             });
 
             // print out intermediate brightness states
