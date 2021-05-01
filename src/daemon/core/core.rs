@@ -825,101 +825,107 @@ impl Daemon {
                 to_fade_unsafe_cell.get().as_mut().unwrap()
             };
 
-            macro_rules! set_fading_status {
-                ($status:expr) => {
-                    for (_, monitor_info) in to_fade.iter() {
-                        monitor_info.is_fading.set($status)
+            if !to_fade.is_empty() {
+                macro_rules! set_fading_status {
+                    ($status:expr) => {
+                        for (_, monitor_info) in to_fade.iter() {
+                            monitor_info.is_fading.set($status)
+                        }
                     }
                 }
-            }
 
-            set_fading_status!(true);
+                set_fading_status!(true);
 
-            // the last step is dedicated to setting the brightness exactly to
-            // new_brightness
-            // if we only went by adding brightness_step, we would not end up exactly where
-            // we wanted to be
-            let iterator_num_steps = total_num_steps - 1;
+                // the last step is dedicated to setting the brightness exactly to
+                // new_brightness
+                // if we only went by adding brightness_step, we would not end up exactly where
+                // we wanted to be
+                let iterator_num_steps = total_num_steps - 1;
 
-            let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
+                let fade_step_delay = std::time::Duration::from_millis(fade_options.step_duration as u64);
 
-            macro_rules! fade_iterator {
-                () => {
-                    to_fade.iter().map(|(&i, _)| i)
-                }
-            }
-
-            if let Err(e) = self.refresh_brightness(fade_iterator!(), auto_remove_displays).await {
-                socket_message_holder.queue_error(format!("Error refreshing brightness: {}", e));
-            }
-
-            // the problem here is that in order to get the futures from the mutex recv() function,
-            // we need a mutable reference to the mutex guard, and as a result a mutable reference
-            // to (eventually) the to_fade iterator
-            // is there a way to iterate immutably over to_fade while still getting a mutable
-            // reference to mutex_guard?
-            //
-            // FuturesUnordered because we only care if ONE OF the futures resolves
-            // the actual "order" of the futures is meaningless since that is just the order of the
-            // adapters
-            let mut receiver_futures = unsafe {
-                let to_fade_alias = to_fade_unsafe_cell.get().as_mut().unwrap();
-                to_fade_alias
-                    .iter_mut()
-                    .map(|(_, monitor_info)| {
-                        monitor_info.current_brightness.mutex_guard.recv()
-                    }).collect::<FuturesUnordered<_>>()
-            };
-
-            for _ in 0..iterator_num_steps {
-                for (i, (_, monitor_info)) in to_fade.iter_mut().enumerate() {
-                    println!("Starting {} brightness: {}", i, monitor_info.current_brightness.get());
-                    let brightness = monitor_info.current_brightness.get() + monitor_info.brightness_change_info.brightness_step;
-                    println!("{} brightness: {}", i, brightness);
-                    monitor_info.current_brightness.set(brightness);
+                macro_rules! fade_iterator {
+                    () => {
+                        to_fade.iter().map(|(&i, _)| i)
+                    }
                 }
 
-                // do not autoremove displays because we do not want to slow it down
-                // autoremove means that we will have to wait for the exit codes from each xrandr
-                // process to return before moving on
-                // we optimize the loop by only looking at the exit codes in the very beginning
-                if let Err(e) = self.refresh_brightness(fade_iterator!(), false).await {
-                    socket_message_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
+                if let Err(e) = self.refresh_brightness(fade_iterator!(), auto_remove_displays).await {
+                    socket_message_holder.queue_error(format!("Error refreshing brightness: {}", e));
                 }
 
-                let mut delay_future = tokio::time::delay_for(fade_step_delay);
-
-                // monitors 2 futures
-                // delay_future: checks to see if the fade delay is up
-                // receiver_futures.next(): checks to see if any ForwardedBrightnessInput's have
-                // been sent over the mutex's channel
-                // if it receives a ForwardedBrightnessInput, it will add it to the queue or
-                // process it immediately if its terminate_fade flag is set to true
-                loop {
-                    select! {
-                        _ = &mut delay_future => break,
-                        Some( Some( forwarded_brightness_input ) ) = receiver_futures.next() => {
-                            let terminate_fade = forwarded_brightness_input.brightness_input.terminate_fade;
-
-                            inputs.push_back(forwarded_brightness_input);
-
-                            // interrupt current fade by continuing base loop
-                            // if terminate_fade is true
-                            //
-                            // otherwise the queued input will be processed in the next
-                            // iteration of the loop
-                            if terminate_fade {
-                                socket_message_holder.consume();
-                                set_fading_status!(false);
-                                continue 'base_loop;
-                            }
-                        }
-                    };
+                // the problem here is that in order to get the futures from the mutex recv() function,
+                // we need a mutable reference to the mutex guard, and as a result a mutable reference
+                // to (eventually) the to_fade iterator
+                // is there a way to iterate immutably over to_fade while still getting a mutable
+                // reference to mutex_guard?
+                //
+                // FuturesUnordered because we only care if ONE OF the futures resolves
+                // the actual "order" of the futures is meaningless since that is just the order of the
+                // adapters
+                let mut receiver_futures = unsafe {
+                    let to_fade_alias = to_fade_unsafe_cell.get().as_mut().unwrap();
+                    to_fade_alias
+                        .iter_mut()
+                        .map(|(_, monitor_info)| {
+                            monitor_info.current_brightness.mutex_guard.recv()
+                        }).collect::<FuturesUnordered<_>>()
                 };
-            }
 
-            // reset fading back to false
-            set_fading_status!(false);
+                for iter in 0..iterator_num_steps {
+                    println!("Fade loop! {}", iter);
+                    for (i, (_, monitor_info)) in to_fade.iter_mut().enumerate() {
+                        println!("Starting {} brightness: {}", i, monitor_info.current_brightness.get());
+                        let brightness = monitor_info.current_brightness.get() + monitor_info.brightness_change_info.brightness_step;
+                        println!("{} brightness: {}", i, brightness);
+                        monitor_info.current_brightness.set(brightness);
+                    }
+
+                    // do not autoremove displays because we do not want to slow it down
+                    // autoremove means that we will have to wait for the exit codes from each xrandr
+                    // process to return before moving on
+                    // we optimize the loop by only looking at the exit codes in the very beginning
+                    if let Err(e) = self.refresh_brightness(fade_iterator!(), false).await {
+                        socket_message_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
+                    }
+
+                    let mut delay_future = tokio::time::delay_for(fade_step_delay);
+
+                    // monitors 2 futures
+                    // delay_future: checks to see if the fade delay is up
+                    // receiver_futures.next(): checks to see if any ForwardedBrightnessInput's have
+                    // been sent over the mutex's channel
+                    // if it receives a ForwardedBrightnessInput, it will add it to the queue or
+                    // process it immediately if its terminate_fade flag is set to true
+                    loop {
+                        select! {
+                            _ = &mut delay_future => break,
+                            Some( Some( forwarded_brightness_input ) ) = receiver_futures.next() => {
+                                println!("Received future!");
+
+                                let terminate_fade = forwarded_brightness_input.brightness_input.terminate_fade;
+
+                                inputs.push_back(forwarded_brightness_input);
+
+                                // interrupt current fade by continuing base loop
+                                // if terminate_fade is true
+                                //
+                                // otherwise the queued input will be processed in the next
+                                // iteration of the loop
+                                if terminate_fade {
+                                    socket_message_holder.consume();
+                                    println!("Terminating!");
+                                    set_fading_status!(false);
+                                    continue 'base_loop;
+                                }
+                            }
+                        };
+                    };
+                }
+
+                // reset fading back to false
+                set_fading_status!(false);
+            }
 
             // send messages to client
             socket_message_holder.consume();
