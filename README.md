@@ -18,11 +18,13 @@ Since version `1.6.0`, `BrightnessControl` processes input asynchronously, **and
 
 ***
 
+Since version `2.0.0-alpha0`, `BrightnessControl` supports different brightness levels per monitor
+
 Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
 
 When the daemon is started, it loads the following values from disk
 * stored in `~/.cache/brightnesscontrol/persistent_state.toml`
-  * brightness: [0..100] percentage of full brightness
+  * brightness: map of `<adapter name> = [0..100]`; percentage of full brightness
   * nightlight: `true` or `false`; `false` means nightlight is off, `true` means it is on
 
 If the values cannot be parsed correctly, the daemon will instead use the default values.
@@ -43,7 +45,7 @@ If your display configuration is mostly static, consider disabling this option.
 
 For users that often disconnect and reconnect monitors, two external options are the [autorandr](https://github.com/phillipberndt/autorandr) and [srandrd](https://github.com/jceb/srandrd) programs.
 
-Both programs can be used to automatically call `brightness_control --configure-display` whenever the monitor setup changes
+Both programs can be used to automatically call `brightness_control monitors --reconfigure-displays` whenever the monitor setup changes
 
 This is a good alternative to `auto_remove_displays`, which also has the advantage of working when a _new_ monitor is connected
 
@@ -135,9 +137,24 @@ $ brightness_control b -d10
 $ brightness_control b --increment 10
 ```
 
+*To Increase the Brightness by 10% for the Active Monitor*
+```
+$ brightness_control --active b --increment 10
+```
+
+*To Increase the Brightness by 10% for the Monitor "eDP-1"*
+```
+$ brightness_control -m eDP-1 b --increment 10
+```
+
 *To Set the Brightness to 80%*
 ```
 $ brightness_control b --set 80
+```
+
+*To Set the Brightness to 80% for All Enabled Monitors*
+```
+$ brightness_control --enabled b --set 80
 ```
 
 _To Set the Brightness to 50% Without Fading_
@@ -148,6 +165,11 @@ $ brightness_control b -ns80
 _To Terminate the Current Brightness Fade_
 ```
 $ brightness_control b -t
+```
+
+_To Terminate the Current Brightness Fade for Monitor "HDMI-1"_
+```
+$ brightness_control -m HDMI-1 b -t
 ```
 
 _To Terminate/Interrupt the Current Brightness Fade and Decrement the Brightness by 10%_
@@ -164,7 +186,7 @@ $ brightness_control nightlight --toggle
 
 This is necessary when a new display adapter is connected
 ```
-$ brightness_control --configure-display
+$ brightness_control monitors --reconfigure-displays
 ```
 
 *To Start the Daemon*
@@ -182,14 +204,19 @@ _To Print Out the Current Configuration Template_
 $ brightness_control config --print-config-template
 ```
 
-_To Print Out the Current Brightness_
+_To Print Out the Current Brightness for All Enabled Monitors_
 ```
-$ brightness_control --get b
+$ brightness_control --enabled get --b
+```
+
+_To Print Out the Current Brightness for Monitor "eDP-1"_
+```
+$ brightness_control -m eDP-1 get --b
 ```
 
 _To Print Out the Currently Loaded Configuration_
 ```
-$ brightness_control --gconfiguration
+$ brightness_control g --configuration
 ```
 
 *To Reload the Daemon Configuration*
@@ -209,7 +236,7 @@ Whenever the daemon is started, it checks to see if the configuration template i
 
 When the daemon overwrites the template, it will indicate this through stdout. `BrightnessControl` will never overwrite your personal configuration, so whenever new options are added to the template, they have to be copied over manually.
 
-You can reload the configuration without restarting the daemon by running `brightness_control --reload` as shown above.
+You can reload the configuration without restarting the daemon by running `brightness_control config --reload` as shown above.
 
 If the file cannot be parsed, the client will print out the error.
 
