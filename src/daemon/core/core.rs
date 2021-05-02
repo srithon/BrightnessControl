@@ -103,7 +103,7 @@ impl DaemonWrapper {
                         daemon_pointer.clone().as_mut().unwrap()
                     };
 
-                    let mut shutdown_channel = tx.clone();
+                    let shutdown_channel = tx.clone();
                     tokio::spawn(async move {
                         match stream {
                             Ok(mut stream) => {
@@ -162,7 +162,7 @@ impl DaemonWrapper {
         Ok(())
     }
 
-    fn start(self, mut tokio_runtime: Runtime) {
+    fn start(self, tokio_runtime: Runtime) {
         println!("{:?}", tokio_runtime.block_on(self.run()));
         tokio_runtime.shutdown_timeout(std::time::Duration::from_millis(1000));
         println!("Shutdown tokio runtime!");
