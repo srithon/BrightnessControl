@@ -3,11 +3,11 @@ use bincode::Options;
 
 use tokio::{
     fs,
-    net::UnixListener,
+    net::{ UnixListener, UnixStream },
     process::Command,
     sync::{ RwLock, mpsc },
     runtime::{self, Runtime},
-    io::AsyncReadExt,
+    io::{ AsyncReadExt, AsyncWriteExt },
     time,
     try_join,
     select
@@ -18,7 +18,7 @@ use tokio_stream::{
     wrappers::UnixListenerStream
 };
 
-use std::io::{Error, ErrorKind, Write as SyncWrite, Result};
+use std::io::{Error, ErrorKind, Result};
 
 use std::cell::{ Cell, UnsafeCell };
 
@@ -27,6 +27,9 @@ use std::collections::{ VecDeque, BTreeMap };
 use std::cmp;
 
 use futures::stream::{ FuturesUnordered, FuturesOrdered };
+
+use signal_hook::consts::*;
+use signal_hook_tokio::Signals;
 
 use crate::{
     daemon::{
@@ -165,6 +168,7 @@ impl DaemonWrapper {
     fn start(self, tokio_runtime: Runtime) {
         println!("{:?}", tokio_runtime.block_on(self.run()));
         tokio_runtime.shutdown_timeout(std::time::Duration::from_millis(1000));
+        let _ = std::fs::remove_file(SOCKET_PATH);
         println!("Shutdown tokio runtime!");
     }
 }
@@ -988,41 +992,52 @@ impl Daemon {
     }
 }
 
-fn register_sigterm_handler() -> Result<()> {
-    unsafe {
-        signal_hook::register(signal_hook::SIGTERM, move || {
-            // signal_hook 
-            std::thread::spawn(|| {
-                // SEND INPUT TO DAEMON
-                match std::os::unix::net::UnixStream::connect(SOCKET_PATH) {
-                    Ok(mut sock) => {
-                        let mock_save_daemon_input = ProgramInput::Shutdown;
+async fn send_shutdown_signal() {
+    // SEND INPUT TO DAEMON
+    match UnixStream::connect(SOCKET_PATH).await {
+        Ok(mut sock) => {
+            let mock_save_daemon_input = ProgramInput::Shutdown;
 
-                        if let Ok(binary_encoded_input) = BINCODE_OPTIONS.serialize(&mock_save_daemon_input) {
-                            let write_result = sock.write_all(&binary_encoded_input);
-                            match write_result {
-                                Ok(_) => {
-                                    println!("Successfully wrote save command to socket");
-                                },
-                                Err(e) => {
-                                    eprintln!("Failed to write save command to socket: {}", e);
-                                }
-                            }
-                        }
-
-                        // wait 1 second for it to finish
-                        let one_second = std::time::Duration::from_millis(1000);
-                        std::thread::sleep(one_second);
+            if let Ok(binary_encoded_input) = BINCODE_OPTIONS.serialize(&mock_save_daemon_input) {
+                let write_result = sock.write_all(&binary_encoded_input).await;
+                match write_result {
+                    Ok(_) => {
+                        println!("Successfully wrote save command to socket");
                     },
                     Err(e) => {
-                        eprintln!("Couldn't connect: {:?}", e);
+                        eprintln!("Failed to write save command to socket: {}", e);
                     }
-                };
+                }
+            }
+        },
+        Err(e) => {
+            eprintln!("Couldn't connect: {:?}", e);
+        }
+    };
+}
 
-                let _ = std::fs::remove_file(SOCKET_PATH);
-            });
-        })
-    }?;
+async fn handle_signals(signals: Signals) {
+    let mut signals = signals.fuse();
+
+    while let Some(signal) = signals.next().await {
+        match signal {
+            SIGINT | SIGTERM | SIGQUIT => {
+                eprintln!("Received shutdown signal!");
+                tokio::spawn(send_shutdown_signal());
+            },
+            _ => unreachable!("Received unidentified signal: {}", signal)
+        }
+    }
+}
+
+fn register_sigterm_handler() -> Result<()> {
+    let signals_to_monitor = Signals::new(&[
+        SIGTERM,
+        SIGINT,
+        SIGQUIT
+    ])?;
+
+    tokio::spawn(handle_signals(signals_to_monitor));
 
     Ok(())
 }
