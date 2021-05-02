@@ -186,7 +186,7 @@ $ brightness_control nightlight --toggle
 
 This is necessary when a new display adapter is connected
 ```
-$ brightness_control monitors --reconfigure-displays
+$ brightness_control m -r
 ```
 
 *To Start the Daemon*
