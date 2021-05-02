@@ -1,3 +1,8 @@
+# 2.0.0-alpha-1
+- updated project dependencies
+- fades are now smoother and more consistent
+- the daemon now gracefully shuts down after receiving `SIGINT` (Control+c) and `SIGQUIT` signals in addition to the already-handled `SIGTERM`
+
 # 2.0.0-alpha-0
 - monitors now have separate brightness levels
 - you can specify which monitor(s) a command should affect using `-m <adapter name>`, `--active`, `--enabled` or `--all`
