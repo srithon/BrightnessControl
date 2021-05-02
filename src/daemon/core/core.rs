@@ -1,12 +1,12 @@
 use daemonize::Daemonize;
-use bincode::{Options};
+use bincode::Options;
 
 use tokio::{
     prelude::*,
     fs,
     net::UnixListener,
     stream::StreamExt,
-    process::{Command},
+    process::Command,
     sync::{ RwLock, mpsc },
     runtime::{self, Runtime},
     try_join,
@@ -23,11 +23,9 @@ use std::cmp;
 
 use futures::stream::{ FuturesUnordered, FuturesOrdered };
 
-use crate::daemon::fs::*;
-
-use super::{
-    display::*,
-    super::{
+use crate::{
+    daemon::{
+        core::display::*,
         config::{
             runtime::*,
             persistent::*
@@ -36,10 +34,9 @@ use super::{
             lock::*,
             io::*
         },
-        super::{
-            shared::*
-        }
+        fs::*
     },
+    shared::*
 };
 
 enum ProcessInputExitCode {
@@ -688,6 +685,7 @@ impl Daemon {
                 // it doesn't make sense to do it here as well
                 macro_rules! garbage {
                     () => {{
+                        #[allow(invalid_value)]
                         unsafe { std::mem::MaybeUninit::<_>::uninit().assume_init() }
                     }}
                 }

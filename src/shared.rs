@@ -1,3 +1,10 @@
+// this is specifically for MonitorOverrideTOMLCompatible
+// we were getting a warning with Specified { adapter_name: String }
+// explicitly allowing this because we need the field name when serializing into TOML
+// also for some reason this allow wasn't working when it was put only on the enum or only on the
+// field, so it was made module-level
+#![allow(non_shorthand_field_patterns)]
+
 use lazy_static::lazy_static;
 
 use bincode::{Options, DefaultOptions};

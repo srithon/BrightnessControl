@@ -380,7 +380,7 @@ impl CollectiveMonitorStateInternal {
                     _ => unreachable!("Already took care of All case!")
                 };
 
-                let index_vector = match index {
+                match index {
                     Some(&index) => {
                         closure(index)
                     },
@@ -433,7 +433,7 @@ pub struct CollectiveMonitorState {
 
 #[macro_use]
 /// Private module to hide macro from importing modules
-mod PrivateMacros {
+mod private_macros {
     /// Given an optional MonitorOverride and a function that takes a MonitorState and returns
     /// something convertible into a String, returns a concatenation of all the resulting Strings
     /// joined together with newlines

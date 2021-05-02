@@ -118,7 +118,7 @@ fn main() -> Result<()> {
             }
         },
         // match all
-        (_, subcommand) => {
+        _ => {
             send_to_client = true;
         }
     };
