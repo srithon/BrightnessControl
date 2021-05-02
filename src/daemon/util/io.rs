@@ -1,6 +1,6 @@
 use tokio::{
-    prelude::*,
-    net::UnixStream
+    net::UnixStream,
+    io::AsyncWriteExt
 };
 
 pub struct SocketMessage {
@@ -65,7 +65,7 @@ impl SocketMessageHolder {
                 }
 
                 // cleanup; close connection
-                let _ = self.socket.shutdown(std::net::Shutdown::Both);
+                let _ = self.socket.shutdown();
             }
         );
     }
