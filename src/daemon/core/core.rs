@@ -3,11 +3,11 @@ use bincode::Options;
 
 use tokio::{
     fs,
-    net::UnixListener,
+    net::{ UnixListener, UnixStream },
     process::Command,
     sync::{ RwLock, mpsc },
     runtime::{self, Runtime},
-    io::AsyncReadExt,
+    io::{ AsyncReadExt, AsyncWriteExt },
     time,
     try_join,
     select
@@ -18,7 +18,7 @@ use tokio_stream::{
     wrappers::UnixListenerStream
 };
 
-use std::io::{Error, ErrorKind, Write as SyncWrite, Result};
+use std::io::{Error, ErrorKind, Result};
 
 use std::cell::{ Cell, UnsafeCell };
 
@@ -993,12 +993,12 @@ impl Daemon {
 
 async fn send_shutdown_signal() {
     // SEND INPUT TO DAEMON
-    match std::os::unix::net::UnixStream::connect(SOCKET_PATH) {
+    match UnixStream::connect(SOCKET_PATH).await {
         Ok(mut sock) => {
             let mock_save_daemon_input = ProgramInput::Shutdown;
 
             if let Ok(binary_encoded_input) = BINCODE_OPTIONS.serialize(&mock_save_daemon_input) {
-                let write_result = sock.write_all(&binary_encoded_input);
+                let write_result = sock.write_all(&binary_encoded_input).await;
                 match write_result {
                     Ok(_) => {
                         println!("Successfully wrote save command to socket");
