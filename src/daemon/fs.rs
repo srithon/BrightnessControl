@@ -1,7 +1,7 @@
 use directories::ProjectDirs;
 
 use tokio::{
-    io::{BufReader, AsyncReadExt, AsyncBufReadExt, AsyncWriteExt},
+    io::{BufReader, AsyncReadExt, AsyncSeekExt, AsyncBufReadExt, AsyncWriteExt},
     fs::{self, File, OpenOptions}
 };
 

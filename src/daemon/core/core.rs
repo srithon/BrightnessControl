@@ -2,15 +2,20 @@ use daemonize::Daemonize;
 use bincode::Options;
 
 use tokio::{
-    prelude::*,
     fs,
     net::UnixListener,
-    stream::StreamExt,
     process::Command,
     sync::{ RwLock, mpsc },
     runtime::{self, Runtime},
+    io::AsyncReadExt,
+    time,
     try_join,
     select
+};
+
+use tokio_stream::{
+    StreamExt,
+    wrappers::UnixListenerStream
 };
 
 use std::io::{Error, ErrorKind, Write as SyncWrite, Result};
@@ -70,7 +75,7 @@ impl DaemonWrapper {
 
         register_sigterm_handler()?;
 
-        let mut listener = match UnixListener::bind(SOCKET_PATH) {
+        let listener = match UnixListener::bind(SOCKET_PATH) {
             Ok(listener) => listener,
             Err(e) => {
                 eprintln!("Error binding listener: {}", e);
@@ -88,10 +93,10 @@ impl DaemonWrapper {
 
         try_join!(
             async move {
-                let mut incoming = listener.incoming();
+                let mut listener_stream = UnixListenerStream::new(listener);
                 let daemon_pointer = self.daemon.get();
 
-                while let Some(stream) = incoming.next().await {
+                while let Some(stream) = listener_stream.next().await {
                     println!("Stream!");
 
                     let daemon = unsafe {
@@ -289,7 +294,7 @@ impl Daemon {
                     enumerated_futures.get().as_mut().unwrap()
                 };
 
-                enumerated_futures.iter_mut().map(| ( _, future ) | future).rev().collect::<FuturesOrdered<_>>()
+                enumerated_futures.iter_mut().map(| ( _, future ) | future.wait()).rev().collect::<FuturesOrdered<_>>()
             };
 
             let mut removed_display = false;
@@ -316,8 +321,10 @@ impl Daemon {
         else {
             // wait for it on its own
             for (_, mut command) in commands {
-                let call_handle = command.spawn()?;
-                tokio::spawn(call_handle);
+                let mut call_handle = command.spawn()?;
+                tokio::spawn(async move {
+                    call_handle.wait().await
+                });
             }
 
             Ok(false)
@@ -328,8 +335,8 @@ impl Daemon {
         // turn off redshift
         let mut redshift_disable = Command::new("redshift");
         redshift_disable.arg("-x");
-        let call_handle = redshift_disable.spawn()?;
-        tokio::spawn(call_handle);
+        let mut child = redshift_disable.spawn()?;
+        tokio::spawn(async move { child.wait().await });
         Ok(())
     }
 
@@ -338,8 +345,8 @@ impl Daemon {
         let mut redshift_enable = Command::new("redshift");
         redshift_enable.arg("-O");
         redshift_enable.arg(format!("{}", self.config.read().await.nightlight_options.redshift_temperature));
-        let call_handle = redshift_enable.spawn()?;
-        tokio::spawn(call_handle);
+        let mut child = redshift_enable.spawn()?;
+        tokio::spawn(async move { child.wait().await });
         Ok(())
     }
 
@@ -870,6 +877,12 @@ impl Daemon {
                         }).collect::<FuturesUnordered<_>>()
                 };
 
+                let mut timer_interval = time::interval(fade_step_delay);
+                // the first tick completes immediately
+                // we tick here so that there is a delay between the first and second iteration of
+                // the fade loop
+                timer_interval.tick().await;
+
                 for iter in 0..iterator_num_steps {
                     println!("Fade loop! {}", iter);
                     for (i, (_, monitor_info)) in to_fade.iter_mut().enumerate() {
@@ -887,17 +900,15 @@ impl Daemon {
                         socket_message_holder.queue_error(format!("Failed to set brightness during fade: {}", e));
                     }
 
-                    let mut delay_future = tokio::time::delay_for(fade_step_delay);
-
                     // monitors 2 futures
-                    // delay_future: checks to see if the fade delay is up
+                    // timer_interval.tick(): checks to see if the fade delay is up
                     // receiver_futures.next(): checks to see if any ForwardedBrightnessInput's have
                     // been sent over the mutex's channel
                     // if it receives a ForwardedBrightnessInput, it will add it to the queue or
                     // process it immediately if its terminate_fade flag is set to true
                     loop {
                         select! {
-                            _ = &mut delay_future => break,
+                            _ = timer_interval.tick() => break,
                             Some( Some( forwarded_brightness_input ) ) = receiver_futures.next() => {
                                 println!("Received future!");
 
@@ -1061,10 +1072,9 @@ pub fn daemon(fork: bool) -> Result<()> {
         }
     }
 
-    let mut tokio_runtime = runtime::Builder::new()
-        .core_threads(2)
-        .max_threads(4)
-        .threaded_scheduler()
+    let tokio_runtime = runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .max_blocking_threads(4)
         // WAS enable_io
         .enable_all()
         .build()?;
