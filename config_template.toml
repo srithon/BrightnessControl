@@ -38,6 +38,8 @@ auto_remove_displays = true
 # you usually don't want this behavior
 type = "All"
 ##########################
+# type = "Enabled"
+##########################
 
 [nightlight_options]
 # When use_redshift is set to false, BrightnessControl uses xrandr --gamma to
