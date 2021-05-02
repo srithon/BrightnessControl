@@ -1,6 +1,6 @@
 [package]
 name = "brightness_control"
-version = "1.6.2"
+version = "2.0.0-alpha0"
 authors = ["Sridaran Thoniyil <sri7thon@gmail.com>"]
 edition = "2018"
 
@@ -17,6 +17,9 @@ toml = "0.5.6"
 lazy_static = "1.4.0"
 tokio = { version = "0.2.22", features = ["full"] }
 futures = "0.3.7"
+fnv = "1.0.7"
+# crates.io version is out of date: 1.16
+fields-converter-derive = { git = "https://gitlab.com/mexus/fields-converter.git", rev = "a4f8527f" }
 
 [dependencies.regex]
 version = "1.4.1"

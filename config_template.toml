@@ -1,4 +1,4 @@
-# v1.6.0-alpha.1
+# v1.7.0
 # ^ KEEP THIS IN THE TEMPLATE
 # Every time the template is updated, the current version is put at the top
 # You can delete it in your own config, but this should stay in the template
@@ -23,6 +23,16 @@ use_redshift = false
 # When connecting a new display, use `brightness_control -c` to apply settings
 # to that display
 auto_remove_displays = true
+
+# determines which monitors to affect when no monitor override is specified on the command line
+[monitor_default_behavior]
+# OPTIONS
+# type = "Specified"
+# adapter_name = "<Specified Adapter Name>"
+#
+# type = "Active"
+#
+type = "All"
 
 [nightlight_options]
 # When use_redshift is set to false, BrightnessControl uses xrandr --gamma to
