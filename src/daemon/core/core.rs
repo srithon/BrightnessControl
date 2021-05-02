@@ -168,6 +168,7 @@ impl DaemonWrapper {
     fn start(self, tokio_runtime: Runtime) {
         println!("{:?}", tokio_runtime.block_on(self.run()));
         tokio_runtime.shutdown_timeout(std::time::Duration::from_millis(1000));
+        let _ = std::fs::remove_file(SOCKET_PATH);
         println!("Shutdown tokio runtime!");
     }
 }
@@ -1008,17 +1009,11 @@ async fn send_shutdown_signal() {
                     }
                 }
             }
-
-            // wait 1 second for it to finish
-            let one_second = std::time::Duration::from_millis(1000);
-            std::thread::sleep(one_second);
         },
         Err(e) => {
             eprintln!("Couldn't connect: {:?}", e);
         }
     };
-
-    let _ = std::fs::remove_file(SOCKET_PATH);
 }
 
 async fn handle_signals(signals: Signals) {
