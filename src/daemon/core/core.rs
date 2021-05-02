@@ -777,7 +777,7 @@ impl Daemon {
 
             // print out intermediate brightness states
             for i in &intermediate_brightness_states {
-                println!("{}: {}", i.0, i.1.current_brightness.get());
+                println!("{}: {} -> {}", i.0, i.1.current_brightness.get(), i.1.brightness_change_info.end_brightness);
             }
 
             // TODO drain filter all the ones that will not be faded
