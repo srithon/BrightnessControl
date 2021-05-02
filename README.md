@@ -260,5 +260,5 @@ Alt+Ctrl+PgDown -> `brightness_control b -d2`
 
 Alt+End         -> `brightness_control n -t`
 
-Alt+Home        -> `brightness_control -c`
+Alt+Home        -> `brightness_control m -r`
 
