@@ -2,6 +2,8 @@ use lazy_static::lazy_static;
 
 use serde::{Serialize, Deserialize};
 
+use crate::shared::*;
+
 pub const CONFIG_TEMPLATE: &str = include_str!("../../../config_template.toml");
 
 lazy_static! {
@@ -31,7 +33,18 @@ pub struct DaemonOptions {
     pub use_redshift: bool,
     pub auto_remove_displays: bool,
     pub fade_options: FadeOptions,
-    pub nightlight_options: NightlightOptions
+    pub nightlight_options: NightlightOptions,
+
+    // discussion here: https://github.com/serde-rs/serde/issues/1310
+    #[serde(deserialize_with = "parse_monitor_default_behavior")]
+    pub monitor_default_behavior: MonitorOverride
+}
+
+/// Parses a MonitorOverrideTOMLCompatible and converts it into a regular MonitorOverride
+fn parse_monitor_default_behavior<'de, D>(input: D) -> Result<MonitorOverride, D::Error> where D: serde::Deserializer<'de> {
+    // https://stackoverflow.com/a/46755370
+    let monitor_override_toml: MonitorOverrideTOMLCompatible = Deserialize::deserialize(input)?;
+    Ok(monitor_override_toml.into())
 }
 
 impl DaemonOptions {

@@ -1,7 +1,7 @@
 use directories::ProjectDirs;
 
 use tokio::{
-    io::{BufReader, AsyncReadExt, AsyncBufReadExt, AsyncWriteExt},
+    io::{BufReader, AsyncReadExt, AsyncSeekExt, AsyncBufReadExt, AsyncWriteExt},
     fs::{self, File, OpenOptions}
 };
 
@@ -15,6 +15,8 @@ use super::config::{
     persistent::{CONFIG_TEMPLATE, DaemonOptions},
     runtime::CachedState
 };
+
+use crate::shared::MonitorOverrideTOMLCompatible;
 
 pub type ConfigAttempt =  std::result::Result::<DaemonOptions, toml::de::Error>;
 
@@ -120,10 +122,12 @@ impl FileUtils {
         match toml::ser::to_vec(cached_state) {
             Ok(serialized_toml) => {
                 // write state to file
-                cache_file.write_all(&serialized_toml).await?
+                cache_file.write_all(&serialized_toml).await?;
+                // cut off excess bytes from previous state of file
+                cache_file.set_len(serialized_toml.len() as u64).await?;
             },
             Err(e) => {
-                eprintln!("Failed to serialize cached state.");
+                eprintln!("Failed to serialize cached state: {}", e);
                 return Err(std::io::Error::new(ErrorKind::Other, format!("{}", e)));
             }
         };
@@ -252,6 +256,13 @@ pub async fn get_configuration_from_file(configuration_file: &mut File) -> std::
 
     // TODO figure out how to use derive macro for this
     overwrite_values!(use_redshift, auto_remove_displays, fade_options, nightlight_options);
+
+    if let Some(monitor_default_behavior) = parsed_toml.get("monitor_default_behavior") {
+        // we have to hardcode this case because otherwise, it will attempt to directly parse it
+        // into a MonitorOverride rather than using the MonitorOverrideTOMLCompatible intermediate
+        // it will not understand the internal tag field and will fail to parse
+        config.monitor_default_behavior = monitor_default_behavior.clone().try_into::<MonitorOverrideTOMLCompatible>()?.into();
+    }
 
     Ok(config)
 }
