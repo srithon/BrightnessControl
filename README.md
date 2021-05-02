@@ -16,9 +16,9 @@ Since version `1.4.5`, `BrightnessControl` can smoothly fade between brightness 
 
 Since version `1.6.0`, `BrightnessControl` processes input asynchronously, **and multiple monitors function as expected**
 
-***
-
 Since version `2.0.0-alpha0`, `BrightnessControl` supports different brightness levels per monitor
+
+## Technical Details
 
 Since version `1.3.0`, `BrightnessControl` uses a daemon to interface with `xrandr`, and client instances to interface with the daemon.
 
@@ -35,7 +35,7 @@ Upon receiving this signal, the daemon writes all of the new values to the files
 
 Manually modifying these files while the daemon is running will have no effect.
 
-***
+### Runtime
 
 If the daemon's call to `xrandr` *fails* as a result of invalid/outdated data in its in-memory `displays` field, the program will automatically remove the corresponding display from the list **IF** `auto_remove_displays` is set to `true` in the configuration file.
 
@@ -230,6 +230,9 @@ If the file does not exist when the daemon is started, it automatically creates 
 
 The default configuration template is stored in `~/.local/share/brightnesscontrol/config_template.toml`
 
+All available options are documented in the template
+
+### Technical Details
 The daemon writes the template to disk when it is first started. To do this manually, copy the output of `brightness_control c --print-default` to the file.
 
 Whenever the daemon is started, it checks to see if the configuration template is out of date. If it is, then it overwrites it with the current template.
@@ -239,8 +242,6 @@ When the daemon overwrites the template, it will indicate this through stdout. `
 You can reload the configuration without restarting the daemon by running `brightness_control config --reload` as shown above.
 
 If the file cannot be parsed, the client will print out the error.
-
-All available options are documented in the template
 
 ## Keybinding
 All of these commands can be bound to keybindings for ease-of-use.
