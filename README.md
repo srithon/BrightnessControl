@@ -206,12 +206,12 @@ $ brightness_control config --print-config-template
 
 _To Print Out the Current Brightness for All Enabled Monitors_
 ```
-$ brightness_control --enabled get --b
+$ brightness_control --enabled get -b
 ```
 
 _To Print Out the Current Brightness for Monitor "eDP-1"_
 ```
-$ brightness_control -m eDP-1 get --b
+$ brightness_control -m eDP-1 get -b
 ```
 
 _To Print Out the Currently Loaded Configuration_
