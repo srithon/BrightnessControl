@@ -36,10 +36,10 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
         };
 
         let override_fade = {
-            if matches.is_present("force_fade") {
+            if brightness_matches.is_present("force_fade") {
                 Some(true)
             }
-            else if matches.is_present("force_no_fade") {
+            else if brightness_matches.is_present("force_no_fade") {
                 Some(false)
             }
             else {
@@ -47,7 +47,7 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
             }
         };
 
-        let terminate_fade = matches.is_present("terminate_fade");
+        let terminate_fade = brightness_matches.is_present("terminate_fade");
 
         Some(
             BrightnessInput {
