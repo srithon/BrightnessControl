@@ -1026,7 +1026,7 @@ async fn handle_signals(signals: Signals) {
 
     while let Some(signal) = signals.next().await {
         match signal {
-            SIGTERM => {
+            SIGINT | SIGTERM | SIGQUIT => {
                 eprintln!("Received shutdown signal!");
                 tokio::spawn(send_shutdown_signal());
             },
@@ -1037,7 +1037,9 @@ async fn handle_signals(signals: Signals) {
 
 fn register_sigterm_handler() -> Result<()> {
     let signals_to_monitor = Signals::new(&[
-        SIGTERM
+        SIGTERM,
+        SIGINT,
+        SIGQUIT
     ])?;
 
     tokio::spawn(handle_signals(signals_to_monitor));
