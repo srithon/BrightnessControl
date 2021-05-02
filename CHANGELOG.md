@@ -1,3 +1,20 @@
+# 2.0.0-alpha-0
+- monitors now have separate brightness levels
+- you can specify which monitor(s) a command should affect using `-m <adapter name>`, `--active`, `--enabled` or `--all`
+    - the distinction between `--all` and `--enabled` is only significant for the `get` subcommand
+        - `--all` will match disconnected monitors while `--enabled` will not
+- add `monitors` subcommand
+    - allows you to set the active monitor with `--set-active <adapter name>`
+    - reconfigure displays (mentioned below)
+
+## Breaking Changes
+- changed `--get` argument into `get` subcommand
+    - the options are now real arguments
+- `get --brightness` now returns lines of format `<adapter name>: <brightness level>`
+    - `brightness level` is a _floating-point number_ from 0 to 100
+    - this is important to know when scripting, as Bash requires you to use different syntax for dealing with floating point numbers
+- renamed `--configure_display` to `monitors > --reconfigure-displays`
+
 # 1.6.2
 * implemented one central cache file instead of one per property
 * fix README
