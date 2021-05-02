@@ -225,9 +225,8 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
         }
     }
 
-    socket.shutdown(std::net::Shutdown::Both)?;
-
     // IF DAEMON IS NOT RUNNING, THROW ERROR
+    socket.shutdown(std::net::Shutdown::Both)?;
 
     Ok(())
 }
