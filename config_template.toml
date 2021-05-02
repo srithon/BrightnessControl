@@ -34,11 +34,11 @@ auto_remove_displays = true
 ##########################
 # type = "Active"
 ##########################
-# NOTE: this affects disabled monitors as well, meaning that when you do `get --brightness` without an override, it would return everything
-# you usually don't want this behavior
-type = "All"
+# # NOTE: this affects disabled monitors as well, meaning that when you do `get --brightness` without an override, it would return everything
+# # you usually don't want this behavior
+# type = "All"
 ##########################
-# type = "Enabled"
+type = "Enabled"
 ##########################
 
 [nightlight_options]
