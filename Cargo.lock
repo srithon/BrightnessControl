@@ -87,7 +87,7 @@ checksum = "5988cb1d626264ac94100be357308f29ff7cbdd3b36bda27f450a4ee3f713426"
 
 [[package]]
 name = "brightness_control"
-version = "1.6.2"
+version = "2.0.0-alpha0"
 dependencies = [
  "bincode",
  "clap",
