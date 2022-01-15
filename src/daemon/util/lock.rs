@@ -18,6 +18,10 @@ where T: Copy {
     pub fn get(&self) -> T {
         *self.internal
     }
+
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.internal
+    }
 }
 
 // a version of RWLock that does not block readers from reading while a writer writes
