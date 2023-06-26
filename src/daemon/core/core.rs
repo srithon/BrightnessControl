@@ -47,6 +47,10 @@ use crate::{
     shared::*
 };
 
+tokio::task_local! {
+    static SOCKET_MESSAGE_HOLDER: SocketMessageHolder;
+}
+
 enum ProcessInputExitCode {
     Normal,
     Shutdown
@@ -56,7 +60,6 @@ enum ProcessInputExitCode {
 struct Daemon {
     // these are primitives, so it doesn't matter
     monitor_states: CollectiveMonitorState,
-    mode: NonReadBlockingRWLock<bool, ()>,
     config: RwLock<DaemonOptions>,
     file_utils: FileUtils
 }
@@ -91,7 +94,6 @@ impl DaemonWrapper {
         // if any message is sent over the channel, the dameon starts shutting down
         let (tx, mut rx) = mpsc::channel::<()>(30);
 
-        println!("Mode: {}", daemon.mode.get());
         println!("{}", daemon.monitor_states.get_formatted_display_states(Some(&MonitorOverride::All)).await);
 
         try_join!(
@@ -204,13 +206,10 @@ impl Daemon {
 
         println!("Loaded configuration: {:?}", config);
 
-        let (mode, monitor_states) = {
+        let monitor_states = {
             let cached_state = file_utils.get_cached_state().await?;
 
-            (
-                NonReadBlockingRWLock::new(cached_state.nightlight, ()),
-                CollectiveMonitorState::new(cached_state.active_monitor, cached_state.brightness_states).await
-            )
+            CollectiveMonitorState::new(cached_state.active_monitor, cached_state.brightness_states).await
         };
 
         let config = RwLock::new(config);
@@ -218,7 +217,6 @@ impl Daemon {
         Ok(
             Daemon {
                 monitor_states,
-                mode,
                 config,
                 file_utils
             }
@@ -232,12 +230,18 @@ impl Daemon {
 
         let mut map = fnv::FnvHashMap::default();
         for monitor_state in iterator {
-            map.insert(monitor_state.get_monitor_name().to_owned(), monitor_state.get_brightness_state().get());
+            let brightness_state = monitor_state.get_brightness_state();
+
+            let brightness_state_internal = BrightnessStateInternal {
+                brightness: brightness_state.get(),
+                nightlight: brightness_state.nightlight.get()
+            };
+
+            map.insert(monitor_state.get_monitor_name().to_owned(), brightness_state_internal);
         }
 
         let cached_state = CachedState {
             brightness_states: map,
-            nightlight: self.mode.get(),
             active_monitor: *monitor_states.get_active_monitor_index()
         };
 
@@ -378,41 +382,67 @@ impl Daemon {
 
     async fn process_input(&mut self, program_input: ProgramInput, mut socket_holder: SocketMessageHolder) -> ProcessInputExitCode {
         match program_input {
-            ProgramInput::ToggleNightlight => {
-                self.mode.set_value(!self.mode.get()).await;
-
-                // janky alternative to an async closure
-                // this allows us to early-return from this block
-                // can't use a regular closure because then we wouldnt be able to use async/await
-                // inside of it
-                // can't use an async block inside of a regular one because then we would need to move all the
-                // captured variables into the block
-                // this is ugly but it works
-                #[allow(clippy::never_loop)]
-                loop {
-                    if self.config.read().await.use_redshift {
-                        if let Err(e) = self.refresh_redshift().await {
-                            socket_holder.queue_error(format!("Failed to refresh redshift: {}", e));
-                            break;
-                        }
-                    }
-                    // not using redshift, so refresh brightness to activate xrandr nightlight active
-                    else if let Err(e) = self.refresh_brightness_all().await {
-                        socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
-                        break;
-                    }
-
-                    // could have used format! to make this a one-liner, but this allows the strings to be
-                    // stored in static memory instead of having to be generated at runtime
-                    if self.mode.get() {
-                        socket_holder.queue_success("Enabled nightlight");
+            ProgramInput::ToggleNightlight(monitor_override) => {
+                let monitor_override = {
+                    if let Some(monitor_override) = monitor_override {
+                        monitor_override
                     }
                     else {
-                        socket_holder.queue_success("Disabled nightlight");
+                        self.config.read().await.monitor_default_behavior.clone()
                     }
-
-                    break;
                 };
+
+                let monitor_override_indices = self.monitor_states.read().await.get_monitor_override_indices(&monitor_override);
+
+                for &monitor_index in &monitor_override_indices {
+                    let monitor_state_guard = self.monitor_states.read().await;
+
+                    let monitor_state = monitor_state_guard.get_monitor_state_by_index(monitor_index).expect("Index must exist");
+                    let brightness_state = monitor_state.get_brightness_state();
+
+                    // NOTE: we want the nightlight state to be locked until we are done refreshing the
+                    // nightlight state
+                    let mut nightlight_lock = brightness_state.nightlight.lock_mut().await;
+
+                    // invert nightlight state
+                    let original_nightlight_state = nightlight_lock.get();
+                    let new_nightlight_state = !original_nightlight_state;
+
+                    nightlight_lock.set(new_nightlight_state);
+
+                    // janky alternative to an async closure
+                    // this allows us to early-return from this block
+                    // can't use a regular closure because then we wouldnt be able to use async/await
+                    // inside of it
+                    // can't use an async block inside of a regular one because then we would need to move all the
+                    // captured variables into the block
+                    // this is ugly but it works
+                    #[allow(clippy::never_loop)]
+                    loop {
+                        if self.config.read().await.use_redshift {
+                            if let Err(e) = self.refresh_redshift().await {
+                                socket_holder.queue_error(format!("Failed to refresh redshift: {}", e));
+                                break;
+                            }
+                        }
+                        // not using redshift, so refresh brightness to activate xrandr nightlight active
+                        else if let Err(e) = self.refresh_brightness_all().await {
+                            socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
+                            break;
+                        }
+
+                        // could have used format! to make this a one-liner, but this allows the strings to be
+                        // stored in static memory instead of having to be generated at runtime
+                        if new_nightlight_state {
+                            socket_holder.queue_success("Enabled nightlight");
+                        }
+                        else {
+                            socket_holder.queue_success("Disabled nightlight");
+                        }
+
+                        break;
+                    };
+                }
             },
             ProgramInput::Get(property) => {
                 // TODO create macro that yields an iterator over MonitorState's
@@ -424,8 +454,10 @@ impl Daemon {
                         // TODO take a MonitorOverride for this one too
                         self.monitor_states.get_formatted_display_names(Some(&MonitorOverride::All)).await
                     },
-                    GetProperty::Mode => {
-                        format!("{}", self.mode.get() as i32)
+                    GetProperty::Mode(optional_monitor_override) => {
+                        self.monitor_states.get_formatted_display_states_with_format(optional_monitor_override.as_ref(), |monitor_state| {
+                            format!("{}", monitor_state.brightness_state.nightlight.get() as i32)
+                        }).await
                     },
                     GetProperty::Config => {
                         format!("{:?}", *self.config.read().await)
@@ -961,32 +993,53 @@ impl Daemon {
 
         let monitor_states = self.monitor_states.read().await;
 
-        let nightlight_on = self.mode.get();
-
         monitors.map(move |monitor_state_index| {
             // TODO safety
             // filter_map instead?
             let monitor_state = monitor_states.get_monitor_state_by_index(monitor_state_index).unwrap();
 
-            let mut xrandr_call = Command::new("xrandr");
+            let monitor = &monitor_state.monitor_data;
 
-            xrandr_call.arg("--output");
-            xrandr_call.arg(monitor_state.get_monitor_name());
+            let brightness_state = &monitor_state.brightness_state;
+            let brightness = brightness_state.get();
+
+            let nightlight_on = brightness_state.nightlight.get();
 
             // TODO don't waste memory on another copy of the brightness
             // maybe pass it in from the calling method?
-            let brightness_string = format!("{:.5}", monitor_state.brightness_state.get() / 100.0);
+            let brightness_string = format!("{:.5}", brightness / 100.0);
 
-            xrandr_call.arg("--brightness")
-                .arg(brightness_string);
+            let command = if config.use_redshift {
+                let mut redshift_call = Command::new("redshift");
 
-            // not using redshift AND nightlight on
-            if !config.use_redshift && nightlight_on {
-                xrandr_call.arg("--gamma")
-                    .arg(&config.nightlight_options.xrandr_gamma);
-            }
+                redshift_call.arg("-PO");
+                redshift_call.arg(format!("{}", if nightlight_on { config.nightlight_options.redshift_temperature } else { 6500 }));
+                redshift_call.arg("-m");
+                // TODO: is monitor_state_index the correct crtc?
+                redshift_call.arg(format!("randr:crtc={}", monitor.crtc_number()));
+                redshift_call.arg("-b")
+                    .arg(brightness_string);
 
-            (monitor_state_index, xrandr_call)
+                redshift_call
+            } else {
+                let mut xrandr_call = Command::new("xrandr");
+
+                xrandr_call.arg("--output");
+                xrandr_call.arg(monitor_state.get_monitor_name());
+
+                xrandr_call.arg("--brightness")
+                    .arg(brightness_string);
+
+                // not using redshift AND nightlight on
+                if nightlight_on {
+                    xrandr_call.arg("--gamma")
+                        .arg(&config.nightlight_options.xrandr_gamma);
+                }
+
+                xrandr_call
+            };
+
+            (monitor_state_index, command)
         })
         .collect()
     }

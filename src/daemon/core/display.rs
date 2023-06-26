@@ -12,7 +12,7 @@ use regex::Regex;
 
 use fnv::FnvHashMap;
 
-use crate::daemon::config::runtime::BrightnessState;
+use crate::daemon::config::runtime::{ BrightnessState, BrightnessStateInternal };
 use crate::shared::*;
 
 lazy_static! {
@@ -163,7 +163,7 @@ pub struct CollectiveMonitorStateInternal {
 }
 
 impl CollectiveMonitorStateInternal {
-    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, f64>) -> CollectiveMonitorStateInternal {
+    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, BrightnessStateInternal>) -> CollectiveMonitorStateInternal {
         let initial_capacity = brightness_states.len() + 3;
 
         let adapters = Vec::with_capacity(initial_capacity);
@@ -183,9 +183,10 @@ impl CollectiveMonitorStateInternal {
             eprintln!("Error refreshing displays: {}", e);
         }
 
-        for (adapter_name, brightness) in brightness_states {
+        for (adapter_name, cached_brightness_state) in brightness_states {
             if let Some(monitor_state) = monitor_states.get_monitor_state_by_name(&adapter_name) {
-                monitor_state.brightness_state.brightness.set_value(brightness).await;
+                monitor_state.brightness_state.brightness.set_value(cached_brightness_state.brightness).await;
+                monitor_state.brightness_state.nightlight.set_value(cached_brightness_state.nightlight).await;
             }
         }
 
@@ -309,7 +310,7 @@ impl CollectiveMonitorStateInternal {
             let adapter_name = monitor.adapter_name.to_ascii_lowercase();
 
             let monitor_state = MonitorState {
-                brightness_state: BrightnessState::new(100.0),
+                brightness_state: BrightnessState::new(100.0, false),
                 monitor_data: monitor
             };
 
@@ -478,7 +479,7 @@ mod private_macros {
 }
 
 impl CollectiveMonitorState {
-    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, f64>) -> CollectiveMonitorState {
+    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, BrightnessStateInternal>) -> CollectiveMonitorState {
         let internal = CollectiveMonitorStateInternal::new(active_monitor, brightness_states).await;
 
         CollectiveMonitorState {
@@ -549,6 +550,8 @@ pub async fn get_available_displays() -> Result<Vec<(Monitor, bool)>> {
 
                 // assign crtc number to the latest display
                 displays.last_mut().expect("Vector must not be empty").0.crtc_number = crtc_number;
+
+                eprintln!("CRTC of {} is {}", displays.last().unwrap().0.adapter_name, crtc_number);
             }
         }
     }
