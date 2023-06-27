@@ -1,7 +1,4 @@
-use super::super::util::{
-    lock::*,
-    io::*
-};
+use super::super::util::{io::*, lock::*};
 
 use super::super::super::shared::*;
 
@@ -9,38 +6,41 @@ use tokio::sync::mpsc;
 
 use fnv::FnvHashMap;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use std::cell::Cell;
 
-pub type BrightnessGuard<'a> = MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>;
+pub type BrightnessGuard<'a> =
+    MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>;
 
 #[derive(Serialize, Deserialize)]
 pub struct CachedState {
     pub active_monitor: usize,
     // in TOML, tables need to be serialized at the END
     // otherwise the other fields look like they are part of the table
-    pub brightness_states: FnvHashMap<String, BrightnessStateInternal>
+    pub brightness_states: FnvHashMap<String, BrightnessStateInternal>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct BrightnessStateInternal {
     pub brightness: f64,
-    pub nightlight: bool
+    pub nightlight: bool,
 }
 
 impl Default for CachedState {
     fn default() -> Self {
         CachedState {
             brightness_states: FnvHashMap::default(),
-            active_monitor: 0
+            active_monitor: 0,
         }
     }
 }
 
 impl CachedState {
     pub fn validate(&self) -> bool {
-        self.brightness_states.iter().all(|(_, ref brightness)| brightness.brightness >= 0.0 && brightness.brightness <= 100.0)
+        self.brightness_states.iter().all(|(_, ref brightness)| {
+            brightness.brightness >= 0.0 && brightness.brightness <= 100.0
+        })
     }
 }
 
@@ -51,7 +51,7 @@ pub enum BrightnessInputInfo {
     UnProcessed,
     Processed {
         relevant_monitor_indices: Vec<usize>,
-    }
+    },
 }
 
 impl BrightnessInputInfo {
@@ -80,25 +80,32 @@ impl BrightnessInputInfo {
 pub struct ForwardedBrightnessInput {
     pub brightness_input: BrightnessInput,
     pub info: BrightnessInputInfo,
-    pub socket_message_holder: SocketMessageHolder
+    pub socket_message_holder: SocketMessageHolder,
 }
 
 impl ForwardedBrightnessInput {
-    pub fn new_unprocessed(brightness_input: BrightnessInput, socket_message_holder: SocketMessageHolder) -> ForwardedBrightnessInput {
+    pub fn new_unprocessed(
+        brightness_input: BrightnessInput,
+        socket_message_holder: SocketMessageHolder,
+    ) -> ForwardedBrightnessInput {
         ForwardedBrightnessInput {
             brightness_input,
             socket_message_holder,
-            info: BrightnessInputInfo::UnProcessed
+            info: BrightnessInputInfo::UnProcessed,
         }
     }
 
-    pub fn new_processed(brightness_input: BrightnessInput, socket_message_holder: SocketMessageHolder, relevant_monitor_indices: Vec<usize>) -> ForwardedBrightnessInput {
+    pub fn new_processed(
+        brightness_input: BrightnessInput,
+        socket_message_holder: SocketMessageHolder,
+        relevant_monitor_indices: Vec<usize>,
+    ) -> ForwardedBrightnessInput {
         ForwardedBrightnessInput {
             brightness_input,
             socket_message_holder,
             info: BrightnessInputInfo::Processed {
                 relevant_monitor_indices,
-            }
+            },
         }
     }
 }
@@ -108,7 +115,7 @@ pub struct BrightnessState {
     pub brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>,
     pub nightlight: NonReadBlockingRWLock<bool, ()>,
     pub fade_notifier: mpsc::UnboundedSender<ForwardedBrightnessInput>,
-    pub is_fading: Cell<bool>
+    pub is_fading: Cell<bool>,
 }
 
 unsafe impl Send for BrightnessState {}
@@ -122,7 +129,7 @@ impl BrightnessState {
             brightness: NonReadBlockingRWLock::new(initial_brightness, rx),
             nightlight: NonReadBlockingRWLock::new(nightlight, ()),
             fade_notifier: tx,
-            is_fading: Cell::new(false)
+            is_fading: Cell::new(false),
         }
     }
 

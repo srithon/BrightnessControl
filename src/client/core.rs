@@ -1,7 +1,7 @@
 use bincode::Options as BincodeOptions;
 use clap::ArgMatches;
 
-use std::io::{Write, Result};
+use std::io::{Result, Write};
 
 use std::os::unix::net::UnixStream;
 
@@ -9,22 +9,25 @@ use std::io::{BufRead, BufReader};
 
 use crate::shared::*;
 
-fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverride>) -> Option<ProgramInput> {
-    let optional_brightness_input = if let Some(brightness_matches) = matches.subcommand_matches("brightness") {
+fn check_brightness(
+    matches: &ArgMatches,
+    override_monitor: Option<MonitorOverride>,
+) -> Option<ProgramInput> {
+    let optional_brightness_input = if let Some(brightness_matches) =
+        matches.subcommand_matches("brightness")
+    {
         let brightness_change = if let Some(new_brightness) = brightness_matches.value_of("set") {
             // unwrap because caller should be doing input validation
             Some(BrightnessChange::Set(new_brightness.parse::<u8>().unwrap()))
-        }
-        else {
+        } else {
             (|| {
                 let (num_string, multiplier) = {
                     if let Some(brightness_shift) = brightness_matches.value_of("increment") {
                         (brightness_shift, 1)
-                    }
-                    else if let Some(brightness_shift) = brightness_matches.value_of("decrement") {
+                    } else if let Some(brightness_shift) = brightness_matches.value_of("decrement")
+                    {
                         (brightness_shift, -1)
-                    }
-                    else {
+                    } else {
                         return None;
                     }
                 };
@@ -38,25 +41,21 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
         let override_fade = {
             if brightness_matches.is_present("force_fade") {
                 Some(true)
-            }
-            else if brightness_matches.is_present("force_no_fade") {
+            } else if brightness_matches.is_present("force_no_fade") {
                 Some(false)
-            }
-            else {
+            } else {
                 None
             }
         };
 
         let terminate_fade = brightness_matches.is_present("terminate_fade");
 
-        Some(
-            BrightnessInput {
-                brightness: brightness_change,
-                override_fade,
-                override_monitor,
-                terminate_fade
-            }
-        )
+        Some(BrightnessInput {
+            brightness: brightness_change,
+            override_fade,
+            override_monitor,
+            terminate_fade,
+        })
     } else {
         None
     };
@@ -64,39 +63,33 @@ fn check_brightness(matches: &ArgMatches, override_monitor: Option<MonitorOverri
     optional_brightness_input.map(|brightness_input| ProgramInput::Brightness(brightness_input))
 }
 
-fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<ProgramInput> {
+fn check_get_property(
+    matches: &ArgMatches,
+    monitor_override: &Option<MonitorOverride>,
+) -> Option<ProgramInput> {
     if let Some(get_subcommand) = matches.subcommand_matches("get") {
-        let present = |name| {
-            get_subcommand.is_present(name)
-        };
+        let present = |name| get_subcommand.is_present(name);
 
         if get_subcommand.is_present("get_request") {
             let res = if present("brightness") {
                 GetProperty::Brightness(monitor_override.clone())
-            }
-            else if present("mode") {
+            } else if present("mode") {
                 GetProperty::Mode(monitor_override.clone())
-            }
-            else if present("displays") {
+            } else if present("displays") {
                 GetProperty::Displays
-            }
-            else if present("fading") {
+            } else if present("fading") {
                 GetProperty::IsFading(monitor_override.clone())
-            }
-            else if present("config") {
+            } else if present("config") {
                 GetProperty::Config
-            }
-            else {
+            } else {
                 unreachable!("Invalid get argument")
             };
 
             Some(ProgramInput::Get(res))
-        }
-        else {
+        } else {
             None
         }
-    }
-    else {
+    } else {
         None
     }
 }
@@ -104,21 +97,19 @@ fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOve
 fn check_monitor_override(matches: &clap::ArgMatches) -> Option<MonitorOverride> {
     if matches.is_present("monitor_override") {
         let monitor_override = if let Some(monitor) = matches.value_of("monitor") {
-            MonitorOverride::Specified { adapter_name: monitor.to_string() }
-        }
-        else if matches.is_present("active") {
+            MonitorOverride::Specified {
+                adapter_name: monitor.to_string(),
+            }
+        } else if matches.is_present("active") {
             MonitorOverride::Active
-        }
-        else if matches.is_present("enabled") {
+        } else if matches.is_present("enabled") {
             MonitorOverride::Enabled
-        }
-        else {
+        } else {
             MonitorOverride::All
         };
 
         Some(monitor_override)
-    }
-    else {
+    } else {
         None
     }
 }
@@ -129,15 +120,13 @@ fn check_monitor_subcommand(matches: &clap::ArgMatches) -> Option<ProgramInput> 
         if monitor_matches.is_present("active_change") {
             let active_change = if let Some(new_monitor) = monitor_matches.value_of("set_active") {
                 ActiveMonitorChange::SetActive(new_monitor.to_string())
-            }
-            else {
+            } else {
                 unreachable!("active_change present but no argument matched")
             };
 
-            return Some(ProgramInput::ChangeActiveMonitor(active_change))
-        }
-        else if monitor_matches.is_present("reconfigure_displays") {
-            return Some(ProgramInput::ConfigureDisplay)
+            return Some(ProgramInput::ChangeActiveMonitor(active_change));
+        } else if monitor_matches.is_present("reconfigure_displays") {
+            return Some(ProgramInput::ConfigureDisplay);
         }
     }
 
@@ -147,17 +136,20 @@ fn check_monitor_subcommand(matches: &clap::ArgMatches) -> Option<ProgramInput> 
 fn check_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
     if let Some(config_matches) = matches.subcommand_matches("config") {
         if config_matches.is_present("reload_configuration") {
-            return Some(ProgramInput::ConfigureDisplay)
+            return Some(ProgramInput::ConfigureDisplay);
         }
     }
 
     None
 }
 
-fn check_nightlight(matches: &clap::ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<ProgramInput> {
+fn check_nightlight(
+    matches: &clap::ArgMatches,
+    monitor_override: &Option<MonitorOverride>,
+) -> Option<ProgramInput> {
     if let Some(nightlight_matches) = matches.subcommand_matches("nightlight") {
         if nightlight_matches.is_present("toggle_nightlight") {
-            return Some(ProgramInput::ToggleNightlight(monitor_override.clone()))
+            return Some(ProgramInput::ToggleNightlight(monitor_override.clone()));
         }
     }
 
@@ -220,7 +212,7 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
         for line in buffered_reader.lines() {
             match line {
                 Ok(line) => println!("{}", line),
-                Err(e) => eprintln!("Failed to read line: {}", e)
+                Err(e) => eprintln!("Failed to read line: {}", e),
             };
         }
     }

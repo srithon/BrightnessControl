@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::shared::*;
 
@@ -16,7 +16,7 @@ lazy_static! {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NightlightOptions {
     pub xrandr_gamma: String,
-    pub redshift_temperature: u32
+    pub redshift_temperature: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -25,7 +25,7 @@ pub struct FadeOptions {
     // milliseconds
     pub total_duration: u32,
     // milliseconds
-    pub step_duration: u32
+    pub step_duration: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,11 +37,14 @@ pub struct DaemonOptions {
 
     // discussion here: https://github.com/serde-rs/serde/issues/1310
     #[serde(deserialize_with = "parse_monitor_default_behavior")]
-    pub monitor_default_behavior: MonitorOverride
+    pub monitor_default_behavior: MonitorOverride,
 }
 
 /// Parses a MonitorOverrideTOMLCompatible and converts it into a regular MonitorOverride
-fn parse_monitor_default_behavior<'de, D>(input: D) -> Result<MonitorOverride, D::Error> where D: serde::Deserializer<'de> {
+fn parse_monitor_default_behavior<'de, D>(input: D) -> Result<MonitorOverride, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
     // https://stackoverflow.com/a/46755370
     let monitor_override_toml: MonitorOverrideTOMLCompatible = Deserialize::deserialize(input)?;
     Ok(monitor_override_toml.into())
