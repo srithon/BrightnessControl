@@ -339,43 +339,9 @@ impl Daemon {
         }
     }
 
-    fn clear_redshift(&mut self) -> Result<()> {
-        // turn off redshift
-        let mut redshift_disable = Command::new("redshift");
-        redshift_disable.arg("-x");
-        let mut child = redshift_disable.spawn()?;
-        tokio::spawn(async move { child.wait().await });
-        Ok(())
-    }
-
-    async fn enable_redshift(&mut self) -> Result<()> {
-        // turn on redshift
-        let mut redshift_enable = Command::new("redshift");
-        redshift_enable.arg("-O");
-        redshift_enable.arg(format!("{}", self.config.read().await.nightlight_options.redshift_temperature));
-        let mut child = redshift_enable.spawn()?;
-        tokio::spawn(async move { child.wait().await });
-        Ok(())
-    }
-
-    async fn refresh_redshift(&mut self) -> Result<()> {
-        if self.mode.get() {
-            self.enable_redshift().await?;
-        }
-        else {
-            self.clear_redshift()?;
-        }
-
-        Ok(())
-    }
-
     async fn refresh_configuration(&mut self) -> Result<()> {
         // don't need the early return flag here
         let _ = self.refresh_brightness_all().await?;
-
-        if self.config.read().await.use_redshift {
-            self.refresh_redshift().await?;
-        }
 
         Ok(())
     }
@@ -419,14 +385,7 @@ impl Daemon {
                     // this is ugly but it works
                     #[allow(clippy::never_loop)]
                     loop {
-                        if self.config.read().await.use_redshift {
-                            if let Err(e) = self.refresh_redshift().await {
-                                socket_holder.queue_error(format!("Failed to refresh redshift: {}", e));
-                                break;
-                            }
-                        }
-                        // not using redshift, so refresh brightness to activate xrandr nightlight active
-                        else if let Err(e) = self.refresh_brightness_all().await {
+                        if let Err(e) = self.refresh_brightness(monitor_override_indices.iter().map(|index| *index), true).await {
                             socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
                             break;
                         }
