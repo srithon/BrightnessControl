@@ -1,8 +1,8 @@
 use directories::ProjectDirs;
 
 use tokio::{
-    io::{BufReader, AsyncReadExt, AsyncSeekExt, AsyncBufReadExt, AsyncWriteExt},
-    fs::{self, File, OpenOptions}
+    fs::{self, File, OpenOptions},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader},
 };
 
 use std::io::{Error, ErrorKind, Result};
@@ -12,13 +12,13 @@ use std::path::Path;
 use std::fmt::Display;
 
 use super::config::{
-    persistent::{CONFIG_TEMPLATE, DaemonOptions},
-    runtime::CachedState
+    persistent::{DaemonOptions, CONFIG_TEMPLATE},
+    runtime::CachedState,
 };
 
 use crate::shared::MonitorOverrideTOMLCompatible;
 
-pub type ConfigAttempt =  std::result::Result::<DaemonOptions, toml::de::Error>;
+pub type ConfigAttempt = std::result::Result<DaemonOptions, toml::de::Error>;
 
 pub struct FileUtils {
     pub project_directory: ProjectDirs,
@@ -91,21 +91,22 @@ impl FileUtils {
 
         // fill buffer
         if let Err(e) = cache_file.read_to_end(&mut file_contents_buffer).await {
-            eprintln!("Failed to read from configuration file! {}", e);
+            eprintln!("Failed to read from configuration file! {e}");
             return Err(e);
         }
 
         let state = {
-            match toml::from_slice::<CachedState>(&file_contents_buffer[..file_contents_buffer.len()]) {
+            match toml::from_slice::<CachedState>(
+                &file_contents_buffer[..file_contents_buffer.len()],
+            ) {
                 Ok(state) => {
                     // validate values
                     if !state.validate() {
                         CachedState::default()
-                    }
-                    else {
+                    } else {
                         state
                     }
-                },
+                }
                 _ => {
                     eprintln!("Couldn't parse persistent state file!");
                     CachedState::default()
@@ -117,7 +118,7 @@ impl FileUtils {
     }
 
     pub async fn write_cached_state(&self, cached_state: &CachedState) -> Result<()> {
-        let mut cache_file = self.get_central_cache_file().await?; 
+        let mut cache_file = self.get_central_cache_file().await?;
 
         match toml::ser::to_vec(cached_state) {
             Ok(serialized_toml) => {
@@ -125,10 +126,10 @@ impl FileUtils {
                 cache_file.write_all(&serialized_toml).await?;
                 // cut off excess bytes from previous state of file
                 cache_file.set_len(serialized_toml.len() as u64).await?;
-            },
+            }
             Err(e) => {
-                eprintln!("Failed to serialize cached state: {}", e);
-                return Err(std::io::Error::new(ErrorKind::Other, format!("{}", e)));
+                eprintln!("Failed to serialize cached state: {e}");
+                return Err(std::io::Error::new(ErrorKind::Other, format!("{e}")));
             }
         };
 
@@ -183,8 +184,7 @@ impl FileUtils {
                         return Ok(());
                     } else {
                         println!(
-                            "Config template updated! \"{}\" to \"{}\"",
-                            version_string, current_version_string
+                            "Config template updated! \"{version_string}\" to \"{current_version_string}\""
                         );
                     }
                 }
@@ -227,18 +227,24 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
     Ok(project_directory)
 }
 
-pub async fn get_configuration_from_file(configuration_file: &mut File) -> std::result::Result<DaemonOptions, toml::de::Error> {
+pub async fn get_configuration_from_file(
+    configuration_file: &mut File,
+) -> std::result::Result<DaemonOptions, toml::de::Error> {
     // 8 KB
     const INITIAL_BUFFER_SIZE: usize = 8 * 1024;
 
     let mut configuration_buffer = Vec::with_capacity(INITIAL_BUFFER_SIZE);
 
     // fill buffer
-    if let Err(e) = configuration_file.read_to_end(&mut configuration_buffer).await {
-        eprintln!("Failed to read from configuration file! {}", e);
+    if let Err(e) = configuration_file
+        .read_to_end(&mut configuration_buffer)
+        .await
+    {
+        eprintln!("Failed to read from configuration file! {e}");
     }
 
-    let parsed_toml: toml::Value = toml::from_slice(&configuration_buffer[..configuration_buffer.len()])?;
+    let parsed_toml: toml::Value =
+        toml::from_slice(&configuration_buffer[..configuration_buffer.len()])?;
 
     let mut config = DaemonOptions::default();
 
@@ -255,28 +261,38 @@ pub async fn get_configuration_from_file(configuration_file: &mut File) -> std::
     }
 
     // TODO figure out how to use derive macro for this
-    overwrite_values!(use_redshift, auto_remove_displays, fade_options, nightlight_options);
+    overwrite_values!(
+        use_redshift,
+        auto_remove_displays,
+        fade_options,
+        nightlight_options
+    );
 
     if let Some(monitor_default_behavior) = parsed_toml.get("monitor_default_behavior") {
         // we have to hardcode this case because otherwise, it will attempt to directly parse it
         // into a MonitorOverride rather than using the MonitorOverrideTOMLCompatible intermediate
         // it will not understand the internal tag field and will fail to parse
-        config.monitor_default_behavior = monitor_default_behavior.clone().try_into::<MonitorOverrideTOMLCompatible>()?.into();
+        config.monitor_default_behavior = monitor_default_behavior
+            .clone()
+            .try_into::<MonitorOverrideTOMLCompatible>()?
+            .into();
     }
 
     Ok(config)
 }
 
 pub async fn overwrite_file_with_content<T>(file: &mut File, new_content: T) -> Result<()>
-where T: Display {
+where
+    T: Display,
+{
     file.seek(std::io::SeekFrom::Start(0)).await?;
 
-    let formatted_new_content = format!("{}", new_content);
+    let formatted_new_content = format!("{new_content}");
 
     // <<NOTE>> this can overflow? len() returns a usize
     file.set_len(formatted_new_content.len() as u64).await?;
 
-    file.write_all(&formatted_new_content.as_bytes()).await?;
+    file.write_all(formatted_new_content.as_bytes()).await?;
 
     Ok(())
 }

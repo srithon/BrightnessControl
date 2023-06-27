@@ -12,12 +12,13 @@ use regex::Regex;
 
 use fnv::FnvHashMap;
 
-use crate::daemon::config::runtime::{ BrightnessState, BrightnessStateInternal };
+use crate::daemon::config::runtime::{BrightnessState, BrightnessStateInternal};
 use crate::shared::*;
 
 lazy_static! {
     static ref XRANDR_DISPLAY_INFORMATION_REGEX: Regex = {
-        Regex::new(r"(?x) # ignore whitespace
+        Regex::new(
+            r"(?x) # ignore whitespace
         # [[:alpha:]] represents ascii letters
         ^([[:alpha:]]+-[[:digit:]]+) # 0 : the adapter name
         \ # space
@@ -36,28 +37,34 @@ lazy_static! {
         \+
         ([[:digit:]]+) # 5 : y_offset
         )
-        ").unwrap()
+        ",
+        )
+        .unwrap()
     };
-
     static ref XRANDR_CRTC_REGEX: Regex = {
-        Regex::new(r"(?x) # ignore whitespace
+        Regex::new(
+            r"(?x) # ignore whitespace
         ^(\ |\t)+CRTC: (\ |\t)+([[:digit:]]) # 3 : the crtc number
-        ").unwrap()
+        ",
+        )
+        .unwrap()
     };
 }
 
+#[derive(Debug)]
 pub struct MonitorMetadata {
     pub width: u32,
     pub height: u32,
     pub x_offset: u32,
-    pub y_offset: u32
+    pub y_offset: u32,
 }
 
 // encapsulates information from xrandr --current
+#[derive(Debug)]
 pub struct Monitor {
     adapter_name: String,
     monitor_metadata: Option<MonitorMetadata>,
-    crtc_number: usize
+    crtc_number: usize,
 }
 
 impl Monitor {
@@ -72,16 +79,13 @@ impl Monitor {
             // 0 points to the entire match, so skip
             let adapter_name = captures.get(1).unwrap().as_str().to_owned();
 
-            let parse_int = | num: regex::Match | {
-                num.as_str().parse::<u32>()
-            };
+            let parse_int = |num: regex::Match| num.as_str().parse::<u32>();
 
             (|| {
                 let connected = {
                     if let Some(capture) = captures.get(2) {
                         !"disconnected".eq(capture.as_str())
-                    }
-                    else {
+                    } else {
                         false
                     }
                 };
@@ -97,10 +101,9 @@ impl Monitor {
                             width,
                             height,
                             x_offset,
-                            y_offset
+                            y_offset,
                         })
-                    }
-                    else {
+                    } else {
                         None
                     }
                 };
@@ -108,15 +111,15 @@ impl Monitor {
                 let monitor = Monitor {
                     adapter_name,
                     monitor_metadata,
-                    crtc_number: 0
+                    crtc_number: 0,
                 };
 
-                std::result::Result::<Option<(Monitor, bool)>, std::num::ParseIntError>::Ok(
-                    Some( (monitor, connected) )
-                )
-            })().unwrap_or(None)
-        }
-        else {
+                std::result::Result::<Option<(Monitor, bool)>, std::num::ParseIntError>::Ok(Some((
+                    monitor, connected,
+                )))
+            })()
+            .unwrap_or(None)
+        } else {
             None
         }
     }
@@ -136,7 +139,7 @@ impl Monitor {
 
 pub struct MonitorState {
     pub monitor_data: Monitor,
-    pub brightness_state: BrightnessState
+    pub brightness_state: BrightnessState,
 }
 
 impl MonitorState {
@@ -159,11 +162,14 @@ pub struct CollectiveMonitorStateInternal {
     /// index of the "active" monitor
     active_monitor: usize,
     /// map between the name of each adapter and its index within the list
-    monitor_names: FnvHashMap<String, usize>
+    monitor_names: FnvHashMap<String, usize>,
 }
 
 impl CollectiveMonitorStateInternal {
-    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, BrightnessStateInternal>) -> CollectiveMonitorStateInternal {
+    pub async fn new(
+        active_monitor: usize,
+        brightness_states: FnvHashMap<String, BrightnessStateInternal>,
+    ) -> CollectiveMonitorStateInternal {
         let initial_capacity = brightness_states.len() + 3;
 
         let adapters = Vec::with_capacity(initial_capacity);
@@ -175,18 +181,26 @@ impl CollectiveMonitorStateInternal {
             available_adapter_list: adapters,
             enabled_monitors,
             active_monitor,
-            monitor_names
+            monitor_names,
         };
 
         // populates monitor_states fields
         if let Err(e) = monitor_states.refresh_displays().await {
-            eprintln!("Error refreshing displays: {}", e);
+            eprintln!("Error refreshing displays: {e}");
         }
 
         for (adapter_name, cached_brightness_state) in brightness_states {
             if let Some(monitor_state) = monitor_states.get_monitor_state_by_name(&adapter_name) {
-                monitor_state.brightness_state.brightness.set_value(cached_brightness_state.brightness).await;
-                monitor_state.brightness_state.nightlight.set_value(cached_brightness_state.nightlight).await;
+                monitor_state
+                    .brightness_state
+                    .brightness
+                    .set_value(cached_brightness_state.brightness)
+                    .await;
+                monitor_state
+                    .brightness_state
+                    .nightlight
+                    .set_value(cached_brightness_state.nightlight)
+                    .await;
             }
         }
 
@@ -197,10 +211,8 @@ impl CollectiveMonitorStateInternal {
         let index = self.get_monitor_index_by_name(name);
 
         match index {
-            Some(&index) => {
-                self.available_adapter_list.get(index)
-            },
-            _ => None
+            Some(&index) => self.available_adapter_list.get(index),
+            _ => None,
         }
     }
 
@@ -208,21 +220,23 @@ impl CollectiveMonitorStateInternal {
         self.available_adapter_list.get(index)
     }
 
-    pub fn iter_all_monitor_indices(&self) -> impl Iterator<Item=usize> + '_ {
-        (0..self.available_adapter_list.len()).into_iter()
+    pub fn iter_all_monitor_indices(&self) -> impl Iterator<Item = usize> + '_ {
+        0..self.available_adapter_list.len()
     }
 
-    pub fn iter_enabled_monitor_indices(&self) -> impl Iterator<Item=usize> + '_ {
-        self.enabled_monitors.iter().map(|&x| x)
+    pub fn iter_enabled_monitor_indices(&self) -> impl Iterator<Item = usize> + '_ {
+        self.enabled_monitors.iter().copied()
     }
 
-    pub fn iter_enabled_monitor_states(&self) -> impl Iterator<Item=&MonitorState> + '_ {
+    pub fn iter_enabled_monitor_states(&self) -> impl Iterator<Item = &MonitorState> + '_ {
         // TODO filter map?
         // ensure that the unwrap is guaranteed
-        self.enabled_monitors.iter().map(move |&x| self.available_adapter_list.get(x).unwrap())
+        self.enabled_monitors
+            .iter()
+            .map(move |&x| self.available_adapter_list.get(x).unwrap())
     }
 
-    pub fn iter_all_monitor_states(&self) -> impl Iterator<Item=&MonitorState> + '_ {
+    pub fn iter_all_monitor_states(&self) -> impl Iterator<Item = &MonitorState> + '_ {
         self.available_adapter_list.iter()
     }
 
@@ -254,9 +268,9 @@ impl CollectiveMonitorStateInternal {
         match available_displays {
             Ok(displays) => {
                 self.state_overwrite(displays);
-                Ok( () )
-            },
-            Err(e) => Err(e)
+                Ok(())
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -264,33 +278,36 @@ impl CollectiveMonitorStateInternal {
         self.monitor_names.get(&name.to_ascii_lowercase())
     }
 
-    pub fn set_active_monitor_by_name(&mut self, new_active_monitor_name: &str) -> std::result::Result<(), &str> {
+    pub fn set_active_monitor_by_name(
+        &mut self,
+        new_active_monitor_name: &str,
+    ) -> std::result::Result<(), &str> {
         match self.get_monitor_index_by_name(new_active_monitor_name) {
             // TODO use better errors here
             Some(&index) => {
                 if self.is_monitor_index_enabled(index) {
                     self.active_monitor = index;
                     Ok(())
-                }
-                else {
+                } else {
                     Err("Requested monitor is disabled!")
                 }
-            },
-            None => Err("Requested monitor does not exist!")
+            }
+            None => Err("Requested monitor does not exist!"),
         }
     }
 
     // NOTE if we dont specify that the str in the return type is static, we will get lifetime
     // issues because the borrow checker will think that the str lifetime is tied to that of 'self'
-    pub fn set_active_monitor_by_index(&mut self, new_active_monitor_index: usize) -> std::result::Result<(), &'static str> {
+    pub fn set_active_monitor_by_index(
+        &mut self,
+        new_active_monitor_index: usize,
+    ) -> std::result::Result<(), &'static str> {
         // if the index is greater than or equal to the length of the adapter list, it is out of bounds
         if self.available_adapter_list.len() <= new_active_monitor_index {
-            return Err("Specified index does not exist!");
-        }
-        else if !self.is_monitor_index_enabled(new_active_monitor_index) {
+            Err("Specified index does not exist!")
+        } else if !self.is_monitor_index_enabled(new_active_monitor_index) {
             return Err("Specified monitor is not enabled!");
-        }
-        else {
+        } else {
             self.active_monitor = new_active_monitor_index;
             Ok(())
         }
@@ -302,16 +319,19 @@ impl CollectiveMonitorStateInternal {
 
     // returns Some(index) if the monitor was found, otherwise None
     fn overwrite_monitor_metadata(&mut self, monitor: Monitor) -> usize {
-        if let Some(&index) = self.get_monitor_index_by_name(&monitor.name()) {
-            self.available_adapter_list.get_mut(index).unwrap().monitor_data.update_metadata(monitor.monitor_metadata);
+        if let Some(&index) = self.get_monitor_index_by_name(monitor.name()) {
+            self.available_adapter_list
+                .get_mut(index)
+                .unwrap()
+                .monitor_data
+                .update_metadata(monitor.monitor_metadata);
             index
-        }
-        else {
+        } else {
             let adapter_name = monitor.adapter_name.to_ascii_lowercase();
 
             let monitor_state = MonitorState {
                 brightness_state: BrightnessState::new(100.0, false),
-                monitor_data: monitor
+                monitor_data: monitor,
             };
 
             self.available_adapter_list.push(monitor_state);
@@ -337,9 +357,8 @@ impl CollectiveMonitorStateInternal {
 
     pub fn is_monitor_name_enabled(&self, monitor_name: &str) -> bool {
         if let Some(index) = self.get_monitor_index_by_name(monitor_name) {
-            self.enabled_monitors.contains(&index)
-        }
-        else {
+            self.enabled_monitors.contains(index)
+        } else {
             false
         }
     }
@@ -369,36 +388,35 @@ impl CollectiveMonitorStateInternal {
     // to work around this, we do the mapping within the function itself and then return the
     // normalized result: a vector
     // generalized map to for_each
-    pub fn for_each_monitor_override_iterator(&self, monitors: &MonitorOverride, closure: &mut impl FnMut(usize)) {
+    pub fn for_each_monitor_override_iterator(
+        &self,
+        monitors: &MonitorOverride,
+        closure: &mut impl FnMut(usize),
+    ) {
         match monitors {
             MonitorOverride::All => {
                 let iterator = self.iter_all_monitor_indices();
                 iterator.for_each(closure)
-            },
+            }
             MonitorOverride::Enabled => {
                 let iterator = self.iter_enabled_monitor_indices();
                 iterator.for_each(closure)
-            },
+            }
             x => {
                 let index = match x {
                     MonitorOverride::Specified { ref adapter_name } => {
                         // TODO remove this copy
                         // either do it in-place (mutably) or sanitize the input beforehand by
                         // making it lowercase
-                        self.get_monitor_index_by_name(&adapter_name)
-                    },
-                    MonitorOverride::Active => {
-                        Some(self.get_active_monitor_index())
-                    },
-                    _ => unreachable!("Already took care of All case!")
+                        self.get_monitor_index_by_name(adapter_name)
+                    }
+                    MonitorOverride::Active => Some(self.get_active_monitor_index()),
+                    _ => unreachable!("Already took care of All case!"),
                 };
 
-                match index {
-                    Some(&index) => {
-                        closure(index)
-                    },
-                    None => ()
-                };
+                if let Some(&index) = index {
+                    closure(index);
+                }
             }
         }
     }
@@ -408,30 +426,28 @@ impl CollectiveMonitorStateInternal {
             MonitorOverride::All => {
                 let iterator = self.iter_all_monitor_indices();
                 iterator.collect()
-            },
+            }
             MonitorOverride::Enabled => {
                 let iterator = self.iter_enabled_monitor_indices();
                 iterator.collect()
-            },
+            }
             x => {
                 let index = match x {
                     MonitorOverride::Specified { ref adapter_name } => {
                         // TODO remove this copy
                         // either do it in-place (mutably) or sanitize the input beforehand by
                         // making it lowercase
-                        self.get_monitor_index_by_name(&adapter_name)
-                    },
-                    MonitorOverride::Active => {
-                        Some(self.get_active_monitor_index())
-                    },
-                    _ => unreachable!("Already took care of All case!")
+                        self.get_monitor_index_by_name(adapter_name)
+                    }
+                    MonitorOverride::Active => Some(self.get_active_monitor_index()),
+                    _ => unreachable!("Already took care of All case!"),
                 };
 
                 match index {
                     Some(&index) => {
                         vec![index]
-                    },
-                    None => vec![]
+                    }
+                    None => vec![],
                 }
             }
         }
@@ -441,7 +457,7 @@ impl CollectiveMonitorStateInternal {
 /// RwLock wrapper around CollectiveMonitorStateInternal
 /// Provides thread-safety to single-threaded object
 pub struct CollectiveMonitorState {
-    pub monitor_states: RwLock<CollectiveMonitorStateInternal>
+    pub monitor_states: RwLock<CollectiveMonitorStateInternal>,
 }
 
 #[macro_use]
@@ -452,51 +468,65 @@ mod private_macros {
     /// joined together with newlines
     /// If monitor_override is None, default to using all monitors (disabled and enabled)
     macro_rules! collect_formatted_displays_string {
-        ($self:expr, $monitor_override:expr, $closure:expr, $separator:expr) => {
-            {
-                // exclusive read
-                let guard = $self.monitor_states.read().await;
+        ($self:expr, $monitor_override:expr, $closure:expr, $separator:expr) => {{
+            // exclusive read
+            let guard = $self.monitor_states.read().await;
 
-                if $monitor_override.is_none() {
-                    guard
-                        .iter_all_monitor_states()
-                        .map($closure)
-                        .collect::<Vec<_>>()
-                        .join($separator)
-                }
-                else {
-                    guard
-                        .get_monitor_override_indices($monitor_override.unwrap())
-                        .into_iter()
-                        .map(|monitor_index| guard.get_monitor_state_by_index(monitor_index).unwrap())
-                        .map($closure)
-                        .collect::<Vec<_>>()
-                        .join($separator)
-                }
+            if $monitor_override.is_none() {
+                guard
+                    .iter_all_monitor_states()
+                    .map($closure)
+                    .collect::<Vec<_>>()
+                    .join($separator)
+            } else {
+                guard
+                    .get_monitor_override_indices($monitor_override.unwrap())
+                    .into_iter()
+                    .map(|monitor_index| guard.get_monitor_state_by_index(monitor_index).unwrap())
+                    .map($closure)
+                    .collect::<Vec<_>>()
+                    .join($separator)
             }
-        }
+        }};
     }
 }
 
 impl CollectiveMonitorState {
-    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, BrightnessStateInternal>) -> CollectiveMonitorState {
+    pub async fn new(
+        active_monitor: usize,
+        brightness_states: FnvHashMap<String, BrightnessStateInternal>,
+    ) -> CollectiveMonitorState {
         let internal = CollectiveMonitorStateInternal::new(active_monitor, brightness_states).await;
 
         CollectiveMonitorState {
-            monitor_states: RwLock::new(internal)
+            monitor_states: RwLock::new(internal),
         }
     }
 
     /// Returns space-separated list of display names matched by monitor_override
-    pub async fn get_formatted_display_names(&self, monitor_override: Option<&MonitorOverride>) -> String {
-        collect_formatted_displays_string!(self, monitor_override, |monitor_state| monitor_state.monitor_data.adapter_name.as_ref(), " ")
+    pub async fn get_formatted_display_names(
+        &self,
+        monitor_override: Option<&MonitorOverride>,
+    ) -> String {
+        collect_formatted_displays_string!(
+            self,
+            monitor_override,
+            |monitor_state| monitor_state.monitor_data.adapter_name.as_ref(),
+            " "
+        )
     }
 
     /// Returns newline-separated list of "<display name>: <brightness level>" for displays matched
     /// by monitor_override
-    pub async fn get_formatted_display_states(&self, monitor_override: Option<&MonitorOverride>) -> String {
-        collect_formatted_displays_string!(self, monitor_override, |monitor_state|
-            format!("{}: {}",
+    pub async fn get_formatted_display_states(
+        &self,
+        monitor_override: Option<&MonitorOverride>,
+    ) -> String {
+        collect_formatted_displays_string!(
+            self,
+            monitor_override,
+            |monitor_state| format!(
+                "{}: {}",
                 monitor_state.monitor_data.adapter_name,
                 monitor_state.brightness_state.brightness.get()
             ),
@@ -506,10 +536,16 @@ impl CollectiveMonitorState {
 
     /// Returns newline-separated list of "<display name>: <result of closure(&MonitorState)>" for
     /// displays matched by monitor_override
-    pub async fn get_formatted_display_states_with_format<T: std::fmt::Display>(&self, monitor_override: Option<&MonitorOverride>, closure: impl Fn(&MonitorState) -> T) -> String
-    {
-        collect_formatted_displays_string!(self, monitor_override, |monitor_state|
-            format!("{}: {}",
+    pub async fn get_formatted_display_states_with_format<T: std::fmt::Display>(
+        &self,
+        monitor_override: Option<&MonitorOverride>,
+        closure: impl Fn(&MonitorState) -> T,
+    ) -> String {
+        collect_formatted_displays_string!(
+            self,
+            monitor_override,
+            |monitor_state| format!(
+                "{}: {}",
                 monitor_state.monitor_data.adapter_name,
                 closure(monitor_state)
             ),
@@ -535,7 +571,9 @@ pub async fn get_available_displays() -> Result<Vec<(Monitor, bool)>> {
 
     // the '&' operator dereferences ascii_code so that it can be compared with a regular u8
     // its original type is &u8
-    let output_lines = command_output.stdout.split(| &ascii_code | ascii_code == b'\n');
+    let output_lines = command_output
+        .stdout
+        .split(|&ascii_code| ascii_code == b'\n');
 
     let mut displays: Vec<(Monitor, bool)> = Vec::new();
 
@@ -546,12 +584,23 @@ pub async fn get_available_displays() -> Result<Vec<(Monitor, bool)>> {
                 displays.push(monitor)
             } else if let Some(captures) = (*XRANDR_CRTC_REGEX).captures(line) {
                 let crtc_number_string = captures.get(3).expect("Capture must have a 3rd item");
-                let crtc_number = crtc_number_string.as_str().parse().expect("CRTC number must be parsable");
+                let crtc_number = crtc_number_string
+                    .as_str()
+                    .parse()
+                    .expect("CRTC number must be parsable");
 
                 // assign crtc number to the latest display
-                displays.last_mut().expect("Vector must not be empty").0.crtc_number = crtc_number;
+                displays
+                    .last_mut()
+                    .expect("Vector must not be empty")
+                    .0
+                    .crtc_number = crtc_number;
 
-                eprintln!("CRTC of {} is {}", displays.last().unwrap().0.adapter_name, crtc_number);
+                eprintln!(
+                    "CRTC of {} is {}",
+                    displays.last().unwrap().0.adapter_name,
+                    crtc_number
+                );
             }
         }
     }

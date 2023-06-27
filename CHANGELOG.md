@@ -1,3 +1,12 @@
+# 2.1.0
+- fixed minor bugs
+- fixed code formatting
+- addressed code warnings
+- updated project dependencies
+
+# 2.0.0-alpha-2
+- implement monitor-specific nightlight mode
+
 # 2.0.0-alpha-1
 - updated project dependencies
 - fades are now smoother and more consistent

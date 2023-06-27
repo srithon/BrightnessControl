@@ -6,19 +6,17 @@ use clap::AppSettings;
 
 use std::io::Result;
 
-use brightness_control::{daemon, client};
+use brightness_control::{client, daemon};
 
 fn get_cli_interface() -> clap::App<'static, 'static> {
     let percentage_validator = |arg: String| {
         if let Ok(num) = arg.parse::<i16>() {
-            if num <= 100 && num >= -100 {
+            if (-100..=100).contains(&num) {
                 Ok(())
-            }
-            else {
+            } else {
                 Err("Percentage out of bounds!".to_owned())
             }
-        }
-        else {
+        } else {
             Err("Invalid percentage!".to_owned())
         }
     };
@@ -75,7 +73,7 @@ fn get_cli_interface() -> clap::App<'static, 'static> {
                 (@arg print_default: -p --("print-default") "Prints out the default daemon configuration")
             )
         )
-        (@subcommand get => 
+        (@subcommand get =>
             (about: "Retrieves values from the daemon")
             (visible_alias: "g")
             (@group get_request =>
@@ -108,15 +106,14 @@ fn main() -> Result<()> {
             if sub_app.is_present("start") {
                 daemon::start_daemon(!sub_app.is_present("no_fork"))?;
             }
-        },
+        }
         ("config", Some(sub_app)) => {
             if sub_app.is_present("print-default") {
                 println!("{}", daemon::config::persistent::CONFIG_TEMPLATE);
-            }
-            else {
+            } else {
                 send_to_client = true;
             }
-        },
+        }
         // match all
         _ => {
             send_to_client = true;
