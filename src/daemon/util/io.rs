@@ -1,6 +1,6 @@
 use tokio::{
-    prelude::*,
-    net::UnixStream
+    net::UnixStream,
+    io::AsyncWriteExt
 };
 
 pub struct SocketMessage {
@@ -47,8 +47,16 @@ impl SocketMessageHolder {
         // write all messages to the socket
         tokio::spawn(
             async move {
-                for message_struct in self.messages.into_iter() {
+                for (index, message_struct) in self.messages.into_iter().enumerate() {
                     let message = message_struct.message;
+
+                    // add newline separator before every line OTHER than the first line
+                    // (so we dont have a blank line in the beginning)
+                    if index != 0 {
+                        // consider doing something with this information
+                        let _ = self.socket.write_all("\n".as_bytes()).await;
+                    }
+
                     if let Err(e) = self.socket.write_all(&message.as_bytes()).await {
                         if message_struct.log_socket_error {
                             eprintln!("Failed to write \"{}\" to socket: {}", message, e);
@@ -57,7 +65,7 @@ impl SocketMessageHolder {
                 }
 
                 // cleanup; close connection
-                let _ = self.socket.shutdown(std::net::Shutdown::Both);
+                let _ = self.socket.shutdown();
             }
         );
     }

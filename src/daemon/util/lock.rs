@@ -14,6 +14,10 @@ where T: Copy {
     pub fn set(&mut self, new_value: T) {
         *self.internal = new_value;
     }
+
+    pub fn get(&self) -> T {
+        *self.internal
+    }
 }
 
 // a version of RWLock that does not block readers from reading while a writer writes
