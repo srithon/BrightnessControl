@@ -11,7 +11,7 @@ use brightness_control::{client, daemon};
 fn get_cli_interface() -> clap::App<'static, 'static> {
     let percentage_validator = |arg: String| {
         if let Ok(num) = arg.parse::<i16>() {
-            if num <= 100 && num >= -100 {
+            if (-100..=100).contains(&num) {
                 Ok(())
             } else {
                 Err("Percentage out of bounds!".to_owned())

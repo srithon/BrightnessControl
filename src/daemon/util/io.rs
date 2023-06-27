@@ -57,9 +57,9 @@ impl SocketMessageHolder {
                     let _ = self.socket.write_all("\n".as_bytes()).await;
                 }
 
-                if let Err(e) = self.socket.write_all(&message.as_bytes()).await {
+                if let Err(e) = self.socket.write_all(message.as_bytes()).await {
                     if message_struct.log_socket_error {
-                        eprintln!("Failed to write \"{}\" to socket: {}", message, e);
+                        eprintln!("Failed to write \"{message}\" to socket: {e}");
                     }
                 }
             }

@@ -91,7 +91,7 @@ impl FileUtils {
 
         // fill buffer
         if let Err(e) = cache_file.read_to_end(&mut file_contents_buffer).await {
-            eprintln!("Failed to read from configuration file! {}", e);
+            eprintln!("Failed to read from configuration file! {e}");
             return Err(e);
         }
 
@@ -128,8 +128,8 @@ impl FileUtils {
                 cache_file.set_len(serialized_toml.len() as u64).await?;
             }
             Err(e) => {
-                eprintln!("Failed to serialize cached state: {}", e);
-                return Err(std::io::Error::new(ErrorKind::Other, format!("{}", e)));
+                eprintln!("Failed to serialize cached state: {e}");
+                return Err(std::io::Error::new(ErrorKind::Other, format!("{e}")));
             }
         };
 
@@ -184,8 +184,7 @@ impl FileUtils {
                         return Ok(());
                     } else {
                         println!(
-                            "Config template updated! \"{}\" to \"{}\"",
-                            version_string, current_version_string
+                            "Config template updated! \"{version_string}\" to \"{current_version_string}\""
                         );
                     }
                 }
@@ -241,7 +240,7 @@ pub async fn get_configuration_from_file(
         .read_to_end(&mut configuration_buffer)
         .await
     {
-        eprintln!("Failed to read from configuration file! {}", e);
+        eprintln!("Failed to read from configuration file! {e}");
     }
 
     let parsed_toml: toml::Value =
@@ -288,12 +287,12 @@ where
 {
     file.seek(std::io::SeekFrom::Start(0)).await?;
 
-    let formatted_new_content = format!("{}", new_content);
+    let formatted_new_content = format!("{new_content}");
 
     // <<NOTE>> this can overflow? len() returns a usize
     file.set_len(formatted_new_content.len() as u64).await?;
 
-    file.write_all(&formatted_new_content.as_bytes()).await?;
+    file.write_all(formatted_new_content.as_bytes()).await?;
 
     Ok(())
 }

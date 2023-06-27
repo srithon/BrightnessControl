@@ -186,7 +186,7 @@ impl CollectiveMonitorStateInternal {
 
         // populates monitor_states fields
         if let Err(e) = monitor_states.refresh_displays().await {
-            eprintln!("Error refreshing displays: {}", e);
+            eprintln!("Error refreshing displays: {e}");
         }
 
         for (adapter_name, cached_brightness_state) in brightness_states {
@@ -221,11 +221,11 @@ impl CollectiveMonitorStateInternal {
     }
 
     pub fn iter_all_monitor_indices(&self) -> impl Iterator<Item = usize> + '_ {
-        (0..self.available_adapter_list.len()).into_iter()
+        0..self.available_adapter_list.len()
     }
 
     pub fn iter_enabled_monitor_indices(&self) -> impl Iterator<Item = usize> + '_ {
-        self.enabled_monitors.iter().map(|&x| x)
+        self.enabled_monitors.iter().copied()
     }
 
     pub fn iter_enabled_monitor_states(&self) -> impl Iterator<Item = &MonitorState> + '_ {
@@ -304,7 +304,7 @@ impl CollectiveMonitorStateInternal {
     ) -> std::result::Result<(), &'static str> {
         // if the index is greater than or equal to the length of the adapter list, it is out of bounds
         if self.available_adapter_list.len() <= new_active_monitor_index {
-            return Err("Specified index does not exist!");
+            Err("Specified index does not exist!")
         } else if !self.is_monitor_index_enabled(new_active_monitor_index) {
             return Err("Specified monitor is not enabled!");
         } else {
@@ -319,7 +319,7 @@ impl CollectiveMonitorStateInternal {
 
     // returns Some(index) if the monitor was found, otherwise None
     fn overwrite_monitor_metadata(&mut self, monitor: Monitor) -> usize {
-        if let Some(&index) = self.get_monitor_index_by_name(&monitor.name()) {
+        if let Some(&index) = self.get_monitor_index_by_name(monitor.name()) {
             self.available_adapter_list
                 .get_mut(index)
                 .unwrap()
@@ -357,7 +357,7 @@ impl CollectiveMonitorStateInternal {
 
     pub fn is_monitor_name_enabled(&self, monitor_name: &str) -> bool {
         if let Some(index) = self.get_monitor_index_by_name(monitor_name) {
-            self.enabled_monitors.contains(&index)
+            self.enabled_monitors.contains(index)
         } else {
             false
         }
@@ -408,16 +408,15 @@ impl CollectiveMonitorStateInternal {
                         // TODO remove this copy
                         // either do it in-place (mutably) or sanitize the input beforehand by
                         // making it lowercase
-                        self.get_monitor_index_by_name(&adapter_name)
+                        self.get_monitor_index_by_name(adapter_name)
                     }
                     MonitorOverride::Active => Some(self.get_active_monitor_index()),
                     _ => unreachable!("Already took care of All case!"),
                 };
 
-                match index {
-                    Some(&index) => closure(index),
-                    None => (),
-                };
+                if let Some(&index) = index {
+                    closure(index);
+                }
             }
         }
     }
@@ -438,7 +437,7 @@ impl CollectiveMonitorStateInternal {
                         // TODO remove this copy
                         // either do it in-place (mutably) or sanitize the input beforehand by
                         // making it lowercase
-                        self.get_monitor_index_by_name(&adapter_name)
+                        self.get_monitor_index_by_name(adapter_name)
                     }
                     MonitorOverride::Active => Some(self.get_active_monitor_index()),
                     _ => unreachable!("Already took care of All case!"),

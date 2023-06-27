@@ -27,6 +27,9 @@ pub struct BrightnessStateInternal {
     pub nightlight: bool,
 }
 
+// Keeping the explicit implementation makes the "arbitrary" default value of `0` for
+// active_monitor explicit.
+#[allow(clippy::derivable_impls)]
 impl Default for CachedState {
     fn default() -> Self {
         CachedState {
@@ -38,9 +41,9 @@ impl Default for CachedState {
 
 impl CachedState {
     pub fn validate(&self) -> bool {
-        self.brightness_states.iter().all(|(_, ref brightness)| {
-            brightness.brightness >= 0.0 && brightness.brightness <= 100.0
-        })
+        self.brightness_states
+            .iter()
+            .all(|(_, brightness)| (0.0..=100.0).contains(&brightness.brightness))
     }
 }
 
@@ -145,7 +148,7 @@ impl BrightnessState {
         self.brightness.try_lock_mut()
     }
 
-    pub async fn lock_brightness<'a>(&'a self) -> BrightnessGuard<'a> {
+    pub async fn lock_brightness(&self) -> BrightnessGuard<'_> {
         self.brightness.lock_mut().await
     }
 }

@@ -20,8 +20,6 @@ use std::cell::{Cell, UnsafeCell};
 
 use std::collections::{BTreeMap, VecDeque};
 
-use std::cmp;
-
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 
 use signal_hook::consts::*;
@@ -32,7 +30,7 @@ use crate::{
         config::{persistent::*, runtime::*},
         core::display::*,
         fs::*,
-        util::{io::*, lock::*},
+        util::io::*,
     },
     shared::*,
 };
@@ -72,7 +70,7 @@ impl DaemonWrapper {
         let listener = match UnixListener::bind(SOCKET_PATH) {
             Ok(listener) => listener,
             Err(e) => {
-                eprintln!("Error binding listener: {}", e);
+                eprintln!("Error binding listener: {e}");
                 fs::remove_file(SOCKET_PATH).await?;
                 UnixListener::bind(SOCKET_PATH)?
             }
@@ -98,7 +96,7 @@ impl DaemonWrapper {
                 while let Some(stream) = listener_stream.next().await {
                     println!("Stream!");
 
-                    let daemon = unsafe { daemon_pointer.clone().as_mut().unwrap() };
+                    let daemon = unsafe { daemon_pointer.as_mut().unwrap() };
 
                     let shutdown_channel = tx.clone();
                     tokio::spawn(async move {
@@ -121,7 +119,7 @@ impl DaemonWrapper {
                                     BINCODE_OPTIONS.deserialize_from(&stream_buffer[..num_bytes]);
                                 match program_input {
                                     Ok(program_input) => {
-                                        println!("Deserialized ProgramInput: {:?}", program_input);
+                                        println!("Deserialized ProgramInput: {program_input:?}");
                                         let res = daemon
                                             .process_input(
                                                 program_input,
@@ -133,21 +131,20 @@ impl DaemonWrapper {
                                             // TODO see if you can just break
                                             match shutdown_channel.send(()).await {
                                                 Ok(_) => println!("Sent shutdown signal!"),
-                                                Err(e) => eprintln!(
-                                                    "Failed to send shutdown signal! {}",
-                                                    e
-                                                ),
+                                                Err(e) => {
+                                                    eprintln!("Failed to send shutdown signal! {e}")
+                                                }
                                             }
                                         }
                                     }
                                     Err(err) => {
-                                        eprintln!("Error deserializing: {}", err);
+                                        eprintln!("Error deserializing: {err}");
                                     }
                                 }
                             }
                             Err(_) => match shutdown_channel.send(()).await {
                                 Ok(_) => println!("Sent shutdown signal!"),
-                                Err(e) => eprintln!("Failed to send shutdown signal! {}", e),
+                                Err(e) => eprintln!("Failed to send shutdown signal! {e}"),
                             },
                         }
 
@@ -191,7 +188,7 @@ impl Daemon {
                 if file_existed {
                     match get_configuration_from_file(&mut config_file).await {
                         Err(e) => {
-                            eprintln!("Error getting configuration from file (initial): {}", e)
+                            eprintln!("Error getting configuration from file (initial): {e}")
                         }
                         // rewrapping Result with different Err type
                         Ok(c) => return Ok(c),
@@ -203,14 +200,14 @@ impl Daemon {
                 let config = DaemonOptions::default();
 
                 // saves creating another instance of DaemonOptions::default()
-                return std::io::Result::<DaemonOptions>::Ok(config);
+                std::io::Result::<DaemonOptions>::Ok(config)
             }
             .await?;
 
             configuration
         };
 
-        println!("Loaded configuration: {:?}", config);
+        println!("Loaded configuration: {config:?}");
 
         let monitor_states = {
             let cached_state = file_utils.get_cached_state().await?;
@@ -410,13 +407,10 @@ impl Daemon {
                     #[allow(clippy::never_loop)]
                     loop {
                         if let Err(e) = self
-                            .refresh_brightness(
-                                monitor_override_indices.iter().map(|index| *index),
-                                true,
-                            )
+                            .refresh_brightness(monitor_override_indices.iter().copied(), true)
                             .await
                         {
-                            socket_holder.queue_error(format!("Failed to refresh xrandr: {}", e));
+                            socket_holder.queue_error(format!("Failed to refresh xrandr: {e}"));
                             break;
                         }
 
@@ -485,7 +479,7 @@ impl Daemon {
                         let active_index = *monitors.get_active_monitor_index();
                         let active_monitor_state =
                             monitors.get_monitor_state_by_index(active_index).unwrap();
-                        format!("{}", active_monitor_state.get_monitor_name())
+                        active_monitor_state.get_monitor_name().to_string()
                     }
                 };
 
@@ -493,7 +487,7 @@ impl Daemon {
             }
             ProgramInput::ConfigureDisplay => {
                 if let Err(e) = self.reconfigure_displays().await {
-                    socket_holder.queue_error(format!("Failed to reconfigure displays: {}", e));
+                    socket_holder.queue_error(format!("Failed to reconfigure displays: {e}"));
                 } else {
                     socket_holder.queue_success("Successfully reconfigured displays!");
                 }
@@ -511,23 +505,21 @@ impl Daemon {
                             }
                             Err(error) => {
                                 socket_holder.queue_error(format!(
-                                    "Failed to parse configuration file: {}",
-                                    error
+                                    "Failed to parse configuration file: {error}",
                                 ));
                             }
                         }
                     }
                     Err(e) => {
                         socket_holder.queue_error(format!(
-                            "Failed to open configuration file for reloading: {}",
-                            e
+                            "Failed to open configuration file for reloading: {e}",
                         ));
                     }
                 }
             }
             ProgramInput::Shutdown => {
                 if let Err(e) = self.save_configuration().await {
-                    socket_holder.queue_error(format!("Failed to save configuration: {}", e));
+                    socket_holder.queue_error(format!("Failed to save configuration: {e}"));
                 } else {
                     socket_holder.queue_success("Successfully saved configuration!");
                 }
@@ -567,7 +559,7 @@ impl Daemon {
 
                         match result {
                             Ok(monitor_name) => socket_holder
-                                .queue_success(format!("Set active monitor to {}!", monitor_name)),
+                                .queue_success(format!("Set active monitor to {monitor_name}!")),
                             Err(message) => socket_holder.queue_error(message),
                         }
                     }
@@ -651,7 +643,7 @@ impl Daemon {
                     monitor_states_guard.get_monitor_override_indices(override_monitor)
                 };
 
-                println!("Monitor indices: {:#?}", monitor_indices);
+                println!("Monitor indices: {monitor_indices:#?}");
 
                 info.transform_unprocessed(monitor_indices);
             }
@@ -680,8 +672,8 @@ impl Daemon {
             {
                 let keys_to_remove: Vec<_> = intermediate_brightness_states
                     .keys()
-                    .map(|&index| index)
-                    .filter(|index| !relevant_monitor_indices.contains(&index))
+                    .copied()
+                    .filter(|index| !relevant_monitor_indices.contains(index))
                     .collect();
 
                 for key in keys_to_remove {
@@ -804,10 +796,7 @@ impl Daemon {
             intermediate_brightness_states
                 .iter_mut()
                 .for_each(|(&monitor_index, monitor_info)| {
-                    println!(
-                        "Iterating intermediate_brightness_states! {}",
-                        monitor_index
-                    );
+                    println!("Iterating intermediate_brightness_states! {monitor_index}");
 
                     let brightness_guard = &monitor_info.current_brightness;
 
@@ -816,14 +805,10 @@ impl Daemon {
                     let new_brightness = {
                         let integer_representation = match brightness_input.brightness {
                             Some(BrightnessChange::Set(new_brightness)) => new_brightness,
-                            Some(BrightnessChange::Adjustment(brightness_shift)) => cmp::max(
-                                cmp::min(
-                                    brightness_shift as i16 + (current_brightness as i16),
-                                    100 as i16,
-                                ),
-                                0,
-                            )
-                                as u8,
+                            Some(BrightnessChange::Adjustment(brightness_shift)) => {
+                                (brightness_shift as i16 + current_brightness as i16).clamp(0, 100)
+                                    as u8
+                            }
                             None => current_brightness as u8,
                         };
 
@@ -928,13 +913,12 @@ impl Daemon {
                         })
                     {
                         socket_message_holder
-                            .queue_success(format!("{}: {}", adapter_name, brightness));
+                            .queue_success(format!("{adapter_name}: {brightness}"));
                     }
                     // socket_message_holder.queue_success(format!("Successfully modified brightness"));
                 }
                 Err(e) => {
-                    socket_message_holder
-                        .queue_error(format!("Failed to refresh brightness: {}", e));
+                    socket_message_holder.queue_error(format!("Failed to refresh brightness: {e}"));
                 }
             };
 
@@ -970,8 +954,7 @@ impl Daemon {
                     .refresh_brightness(fade_iterator!(), auto_remove_displays)
                     .await
                 {
-                    socket_message_holder
-                        .queue_error(format!("Error refreshing brightness: {}", e));
+                    socket_message_holder.queue_error(format!("Error refreshing brightness: {e}"));
                 }
 
                 // the problem here is that in order to get the futures from the mutex recv() function,
@@ -998,15 +981,15 @@ impl Daemon {
                 timer_interval.tick().await;
 
                 for iter in 0..iterator_num_steps {
-                    println!("Fade loop! {}", iter);
+                    println!("Fade loop! {iter}");
                     for (i, (_, monitor_info)) in to_fade.iter_mut().enumerate() {
                         let brightness = monitor_info.current_brightness.get_mut();
 
-                        println!("Starting {} brightness: {}", i, brightness);
+                        println!("Starting {i} brightness: {brightness}");
 
                         *brightness += monitor_info.brightness_change_info.brightness_step;
 
-                        println!("{} brightness: {}", i, brightness);
+                        println!("{i} brightness: {brightness}");
                     }
 
                     // do not autoremove displays because we do not want to slow it down
@@ -1015,7 +998,7 @@ impl Daemon {
                     // we optimize the loop by only looking at the exit codes in the very beginning
                     if let Err(e) = self.refresh_brightness(fade_iterator!(), false).await {
                         socket_message_holder
-                            .queue_error(format!("Failed to set brightness during fade: {}", e));
+                            .queue_error(format!("Failed to set brightness during fade: {e}"));
                     }
 
                     // monitors 2 futures
@@ -1059,8 +1042,8 @@ impl Daemon {
                         .unwrap()
                         .get_monitor_name();
                     socket_message_holder.queue_success(format!(
-                        "{}: {}",
-                        monitor_name, monitor_info.brightness_change_info.end_brightness
+                        "{monitor_name}: {}",
+                        monitor_info.brightness_change_info.end_brightness
                     ));
                 }
             }
@@ -1158,13 +1141,13 @@ async fn send_shutdown_signal() {
                         println!("Successfully wrote save command to socket");
                     }
                     Err(e) => {
-                        eprintln!("Failed to write save command to socket: {}", e);
+                        eprintln!("Failed to write save command to socket: {e}");
                     }
                 }
             }
         }
         Err(e) => {
-            eprintln!("Couldn't connect: {:?}", e);
+            eprintln!("Couldn't connect: {e:?}");
         }
     };
 }
@@ -1184,7 +1167,7 @@ async fn handle_signals(signals: Signals) {
 }
 
 fn register_sigterm_handler() -> Result<()> {
-    let signals_to_monitor = Signals::new(&[SIGTERM, SIGINT, SIGQUIT])?;
+    let signals_to_monitor = Signals::new([SIGTERM, SIGINT, SIGQUIT])?;
 
     tokio::spawn(handle_signals(signals_to_monitor));
 
@@ -1211,7 +1194,7 @@ pub fn daemon(fork: bool) -> Result<()> {
 
         let daemonize = Daemonize::new()
             .pid_file(pid_file_path)
-            .working_directory(&cache_dir)
+            .working_directory(cache_dir)
             // have to do this because the tokio runtime isnt created yet
             // the corresponding functions in FileUtils are async
             .stdout(stdout)
@@ -1231,7 +1214,7 @@ pub fn daemon(fork: bool) -> Result<()> {
 
                 return Err(Error::new(
                     ErrorKind::Other,
-                    format!("Failed to daemonize: {}", stringified_error),
+                    format!("Failed to daemonize: {stringified_error}"),
                 ));
             }
         }

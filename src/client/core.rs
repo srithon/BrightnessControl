@@ -60,7 +60,7 @@ fn check_brightness(
         None
     };
 
-    optional_brightness_input.map(|brightness_input| ProgramInput::Brightness(brightness_input))
+    optional_brightness_input.map(ProgramInput::Brightness)
 }
 
 fn check_get_property(
@@ -157,7 +157,7 @@ fn check_nightlight(
 }
 
 pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
-    let monitor_override = check_monitor_override(&matches);
+    let monitor_override = check_monitor_override(matches);
 
     // recursive macro that goes through each expression in a list and returns the inner value of
     // the first that has one
@@ -177,11 +177,11 @@ pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
     }
 
     return_first_some! {
-        check_get_property(&matches, &monitor_override),
-        check_nightlight(&matches, &monitor_override),
-        check_brightness(&matches, monitor_override),
-        check_configuration(&matches),
-        check_monitor_subcommand(&matches)
+        check_get_property(matches, &monitor_override),
+        check_nightlight(matches, &monitor_override),
+        check_brightness(matches, monitor_override),
+        check_configuration(matches),
+        check_monitor_subcommand(matches)
     }
 
     unreachable!("Invalid input resulted in no ProgramInput")
@@ -211,8 +211,8 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
         let buffered_reader = BufReader::with_capacity(512, &mut socket);
         for line in buffered_reader.lines() {
             match line {
-                Ok(line) => println!("{}", line),
-                Err(e) => eprintln!("Failed to read line: {}", e),
+                Ok(line) => println!("{line}"),
+                Err(e) => eprintln!("Failed to read line: {e}"),
             };
         }
     }

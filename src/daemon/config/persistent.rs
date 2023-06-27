@@ -50,8 +50,8 @@ where
     Ok(monitor_override_toml.into())
 }
 
-impl DaemonOptions {
-    pub fn default() -> DaemonOptions {
+impl Default for DaemonOptions {
+    fn default() -> DaemonOptions {
         (*DEFAULT_CONFIG).clone()
     }
 }
