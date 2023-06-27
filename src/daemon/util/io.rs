@@ -65,7 +65,7 @@ impl SocketMessageHolder {
             }
 
             // cleanup; close connection
-            let _ = self.socket.shutdown();
+            let _ = self.socket.shutdown().await;
         });
     }
 }
