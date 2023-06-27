@@ -555,13 +555,16 @@ impl Daemon {
         unsafe impl<'a> Send for MonitorInfo<'a> {}
         unsafe impl<'a> Sync for MonitorInfo<'a> {}
 
-        // map between monitor index and BrightnessChangeInfo
-        let mut intermediate_brightness_states: BTreeMap<usize, MonitorInfo> = BTreeMap::new();
-
         // use the read() and write() functions
         // this used to be on the inside of the loop so we would have to retake the lock every time
         // should we do it like that again?
         let monitor_states_guard = self.monitor_states.read().await;
+
+        // NOTE: with a new Rust update, this declaration has to come after monitor_states_guard
+        // so that they can be dropped in the same order as they were created.
+
+        // map between monitor index and BrightnessChangeInfo
+        let mut intermediate_brightness_states: BTreeMap<usize, MonitorInfo> = BTreeMap::new();
 
         // process inputs queue
         'base_loop: loop {
