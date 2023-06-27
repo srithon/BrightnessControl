@@ -52,8 +52,14 @@ where
     }
 
     pub async fn set_value(&self, new_value: T) {
-        self.write_mutex.lock().await;
+        // acquire lock
+        let guard = self.write_mutex.lock().await;
+
+        // update value
         self.internal.set(new_value);
+
+        // explicitly drop guard so that it is in scope while setting cell
+        drop(guard);
     }
 
     pub fn try_lock_mut(&self) -> Option<MutexGuardRefWrapper<'_, T, K>> {
