@@ -7,9 +7,9 @@
 
 use lazy_static::lazy_static;
 
-use bincode::{Options, DefaultOptions};
+use bincode::{DefaultOptions, Options};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use fields_converter_derive::*;
 
@@ -28,7 +28,7 @@ pub struct BrightnessInput {
     pub brightness: Option<BrightnessChange>,
     pub override_fade: Option<bool>,
     pub override_monitor: Option<MonitorOverride>,
-    pub terminate_fade: bool
+    pub terminate_fade: bool,
 }
 
 impl BrightnessInput {
@@ -40,7 +40,7 @@ impl BrightnessInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum BrightnessChange {
     Adjustment(i8),
-    Set(u8)
+    Set(u8),
 }
 
 // NOTE KEEP THESE ENUMS IN SYNC
@@ -50,7 +50,7 @@ pub enum MonitorOverride {
     Specified { adapter_name: String },
     Active,
     Enabled,
-    All
+    All,
 }
 
 // NOTE KEEP THESE ENUMS IN SYNC
@@ -78,24 +78,24 @@ pub enum MonitorOverrideTOMLCompatible {
     Specified { adapter_name: String },
     Active,
     Enabled,
-    All
+    All,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum GetProperty {
     Brightness(Option<MonitorOverride>),
     IsFading(Option<MonitorOverride>),
-    Mode,
+    Mode(Option<MonitorOverride>),
     Displays,
     ActiveMonitor,
-    Config
+    Config,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ActiveMonitorChange {
     /// The String field can be either a string representation of the adapter index OR the name of
     /// the adapter
-    SetActive(String)
+    SetActive(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -104,7 +104,7 @@ pub enum ProgramInput {
     Get(GetProperty),
     ChangeActiveMonitor(ActiveMonitorChange),
     ConfigureDisplay,
-    ToggleNightlight,
+    ToggleNightlight(Option<MonitorOverride>),
     ReloadConfiguration,
-    Shutdown
+    Shutdown,
 }
