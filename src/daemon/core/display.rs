@@ -12,7 +12,7 @@ use regex::Regex;
 
 use fnv::FnvHashMap;
 
-use crate::daemon::config::runtime::BrightnessState;
+use crate::daemon::config::runtime::{ BrightnessState, BrightnessStateInternal };
 use crate::shared::*;
 
 lazy_static! {
@@ -38,6 +38,12 @@ lazy_static! {
         )
         ").unwrap()
     };
+
+    static ref XRANDR_CRTC_REGEX: Regex = {
+        Regex::new(r"(?x) # ignore whitespace
+        ^(\ |\t)+CRTC: (\ |\t)+([[:digit:]]) # 3 : the crtc number
+        ").unwrap()
+    };
 }
 
 pub struct MonitorMetadata {
@@ -50,7 +56,8 @@ pub struct MonitorMetadata {
 // encapsulates information from xrandr --current
 pub struct Monitor {
     adapter_name: String,
-    monitor_metadata: Option<MonitorMetadata>
+    monitor_metadata: Option<MonitorMetadata>,
+    crtc_number: usize
 }
 
 impl Monitor {
@@ -100,7 +107,8 @@ impl Monitor {
 
                 let monitor = Monitor {
                     adapter_name,
-                    monitor_metadata
+                    monitor_metadata,
+                    crtc_number: 0
                 };
 
                 std::result::Result::<Option<(Monitor, bool)>, std::num::ParseIntError>::Ok(
@@ -115,6 +123,10 @@ impl Monitor {
 
     pub fn name(&self) -> &String {
         &self.adapter_name
+    }
+
+    pub fn crtc_number(&self) -> usize {
+        self.crtc_number
     }
 
     fn update_metadata(&mut self, new_metadata: Option<MonitorMetadata>) {
@@ -151,7 +163,7 @@ pub struct CollectiveMonitorStateInternal {
 }
 
 impl CollectiveMonitorStateInternal {
-    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, f64>) -> CollectiveMonitorStateInternal {
+    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, BrightnessStateInternal>) -> CollectiveMonitorStateInternal {
         let initial_capacity = brightness_states.len() + 3;
 
         let adapters = Vec::with_capacity(initial_capacity);
@@ -171,9 +183,10 @@ impl CollectiveMonitorStateInternal {
             eprintln!("Error refreshing displays: {}", e);
         }
 
-        for (adapter_name, brightness) in brightness_states {
+        for (adapter_name, cached_brightness_state) in brightness_states {
             if let Some(monitor_state) = monitor_states.get_monitor_state_by_name(&adapter_name) {
-                monitor_state.brightness_state.brightness.set_value(brightness).await;
+                monitor_state.brightness_state.brightness.set_value(cached_brightness_state.brightness).await;
+                monitor_state.brightness_state.nightlight.set_value(cached_brightness_state.nightlight).await;
             }
         }
 
@@ -297,7 +310,7 @@ impl CollectiveMonitorStateInternal {
             let adapter_name = monitor.adapter_name.to_ascii_lowercase();
 
             let monitor_state = MonitorState {
-                brightness_state: BrightnessState::new(100.0),
+                brightness_state: BrightnessState::new(100.0, false),
                 monitor_data: monitor
             };
 
@@ -466,7 +479,7 @@ mod private_macros {
 }
 
 impl CollectiveMonitorState {
-    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, f64>) -> CollectiveMonitorState {
+    pub async fn new(active_monitor: usize, brightness_states: FnvHashMap<String, BrightnessStateInternal>) -> CollectiveMonitorState {
         let internal = CollectiveMonitorStateInternal::new(active_monitor, brightness_states).await;
 
         CollectiveMonitorState {
@@ -517,20 +530,31 @@ impl CollectiveMonitorState {
 pub async fn get_available_displays() -> Result<Vec<(Monitor, bool)>> {
     let mut xrandr_current = Command::new("xrandr");
     xrandr_current.arg("--current");
+    xrandr_current.arg("--verbose");
     let command_output = xrandr_current.output().await?;
+
     // the '&' operator dereferences ascii_code so that it can be compared with a regular u8
     // its original type is &u8
     let output_lines = command_output.stdout.split(| &ascii_code | ascii_code == b'\n');
 
-    let displays: Vec<(Monitor, bool)> = output_lines.filter_map(|line| {
+    let mut displays: Vec<(Monitor, bool)> = Vec::new();
+
+    for line in output_lines {
         // if valid UTF-8, pass to Monitor
         if let Ok(line) = std::str::from_utf8(line) {
-            Monitor::new(line)
+            if let Some(monitor) = Monitor::new(line) {
+                displays.push(monitor)
+            } else if let Some(captures) = (*XRANDR_CRTC_REGEX).captures(line) {
+                let crtc_number_string = captures.get(3).expect("Capture must have a 3rd item");
+                let crtc_number = crtc_number_string.as_str().parse().expect("CRTC number must be parsable");
+
+                // assign crtc number to the latest display
+                displays.last_mut().expect("Vector must not be empty").0.crtc_number = crtc_number;
+
+                eprintln!("CRTC of {} is {}", displays.last().unwrap().0.adapter_name, crtc_number);
+            }
         }
-        else {
-            None
-        }
-    }).collect();
+    }
 
     Ok(displays)
 }

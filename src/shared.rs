@@ -85,7 +85,7 @@ pub enum MonitorOverrideTOMLCompatible {
 pub enum GetProperty {
     Brightness(Option<MonitorOverride>),
     IsFading(Option<MonitorOverride>),
-    Mode,
+    Mode(Option<MonitorOverride>),
     Displays,
     ActiveMonitor,
     Config
@@ -104,7 +104,7 @@ pub enum ProgramInput {
     Get(GetProperty),
     ChangeActiveMonitor(ActiveMonitorChange),
     ConfigureDisplay,
-    ToggleNightlight,
+    ToggleNightlight(Option<MonitorOverride>),
     ReloadConfiguration,
     Shutdown
 }

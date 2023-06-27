@@ -75,7 +75,7 @@ fn check_get_property(matches: &ArgMatches, monitor_override: &Option<MonitorOve
                 GetProperty::Brightness(monitor_override.clone())
             }
             else if present("mode") {
-                GetProperty::Mode
+                GetProperty::Mode(monitor_override.clone())
             }
             else if present("displays") {
                 GetProperty::Displays
@@ -154,10 +154,10 @@ fn check_configuration(matches: &clap::ArgMatches) -> Option<ProgramInput> {
     None
 }
 
-fn check_nightlight(matches: &clap::ArgMatches) -> Option<ProgramInput> {
+fn check_nightlight(matches: &clap::ArgMatches, monitor_override: &Option<MonitorOverride>) -> Option<ProgramInput> {
     if let Some(nightlight_matches) = matches.subcommand_matches("nightlight") {
         if nightlight_matches.is_present("toggle_nightlight") {
-            return Some(ProgramInput::ToggleNightlight)
+            return Some(ProgramInput::ToggleNightlight(monitor_override.clone()))
         }
     }
 
@@ -186,9 +186,9 @@ pub fn get_program_input(matches: &clap::ArgMatches) -> ProgramInput {
 
     return_first_some! {
         check_get_property(&matches, &monitor_override),
+        check_nightlight(&matches, &monitor_override),
         check_brightness(&matches, monitor_override),
         check_configuration(&matches),
-        check_nightlight(&matches),
         check_monitor_subcommand(&matches)
     }
 

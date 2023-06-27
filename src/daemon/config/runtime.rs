@@ -17,18 +17,22 @@ pub type BrightnessGuard<'a> = MutexGuardRefWrapper<'a, f64, mpsc::UnboundedRece
 
 #[derive(Serialize, Deserialize)]
 pub struct CachedState {
-    pub nightlight: bool,
     pub active_monitor: usize,
     // in TOML, tables need to be serialized at the END
     // otherwise the other fields look like they are part of the table
-    pub brightness_states: FnvHashMap<String, f64>
+    pub brightness_states: FnvHashMap<String, BrightnessStateInternal>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BrightnessStateInternal {
+    pub brightness: f64,
+    pub nightlight: bool
 }
 
 impl Default for CachedState {
     fn default() -> Self {
         CachedState {
             brightness_states: FnvHashMap::default(),
-            nightlight: false,
             active_monitor: 0
         }
     }
@@ -36,7 +40,7 @@ impl Default for CachedState {
 
 impl CachedState {
     pub fn validate(&self) -> bool {
-        self.brightness_states.iter().all(|(_, &brightness)| brightness >= 0.0 && brightness <= 100.0)
+        self.brightness_states.iter().all(|(_, ref brightness)| brightness.brightness >= 0.0 && brightness.brightness <= 100.0)
     }
 }
 
@@ -102,6 +106,7 @@ impl ForwardedBrightnessInput {
 pub struct BrightnessState {
     // receiver end of channel in mutex
     pub brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>,
+    pub nightlight: NonReadBlockingRWLock<bool, ()>,
     pub fade_notifier: mpsc::UnboundedSender<ForwardedBrightnessInput>,
     pub is_fading: Cell<bool>
 }
@@ -110,11 +115,12 @@ unsafe impl Send for BrightnessState {}
 unsafe impl Sync for BrightnessState {}
 
 impl BrightnessState {
-    pub fn new(initial_brightness: f64) -> BrightnessState {
+    pub fn new(initial_brightness: f64, nightlight: bool) -> BrightnessState {
         let (tx, rx) = mpsc::unbounded_channel::<ForwardedBrightnessInput>();
 
         BrightnessState {
             brightness: NonReadBlockingRWLock::new(initial_brightness, rx),
+            nightlight: NonReadBlockingRWLock::new(nightlight, ()),
             fade_notifier: tx,
             is_fading: Cell::new(false)
         }
