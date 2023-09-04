@@ -1,3 +1,6 @@
+# 2.1.1
+- fix bug where lowering brightness below 10% would crash daemon
+
 # 2.1.0
 - fixed minor bugs
 - fixed code formatting
