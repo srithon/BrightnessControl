@@ -806,7 +806,7 @@ impl Daemon {
                         let integer_representation = match brightness_input.brightness {
                             Some(BrightnessChange::Set(new_brightness)) => new_brightness,
                             Some(BrightnessChange::Adjustment(brightness_shift)) => {
-                                (brightness_shift as i16 + current_brightness as i16).clamp(0, 100)
+                                (brightness_shift as i16 + current_brightness as i16).clamp(10, 100)
                                     as u8
                             }
                             None => current_brightness as u8,
