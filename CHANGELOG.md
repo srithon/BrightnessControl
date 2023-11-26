@@ -1,3 +1,6 @@
+# 2.1.2
+- update project dependencies
+
 # 2.1.1
 - fix bug where lowering brightness below 10% would crash daemon
 
