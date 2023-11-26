@@ -498,7 +498,7 @@ impl Daemon {
                         let config_result = get_configuration_from_file(&mut configuration_file);
 
                         match config_result.await {
-                            std::result::Result::<DaemonOptions, toml::de::Error>::Ok(config) => {
+                            Result::<DaemonOptions>::Ok(config) => {
                                 *self.config.write().await = config;
 
                                 socket_holder.queue_success("Successfully reloaded configuration!");

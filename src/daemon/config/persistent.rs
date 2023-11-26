@@ -8,7 +8,7 @@ pub const CONFIG_TEMPLATE: &str = include_str!("../../../config_template.toml");
 
 lazy_static! {
     static ref DEFAULT_CONFIG: DaemonOptions = {
-        let parsed_toml: DaemonOptions = toml::from_slice(CONFIG_TEMPLATE.as_bytes()).unwrap();
+        let parsed_toml: DaemonOptions = toml::from_str(CONFIG_TEMPLATE).unwrap();
         parsed_toml
     };
 }

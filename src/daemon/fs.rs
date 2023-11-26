@@ -96,8 +96,9 @@ impl FileUtils {
         }
 
         let state = {
-            match toml::from_slice::<CachedState>(
-                &file_contents_buffer[..file_contents_buffer.len()],
+            match toml::from_str::<CachedState>(
+                std::str::from_utf8(&file_contents_buffer)
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))?,
             ) {
                 Ok(state) => {
                     // validate values
@@ -120,10 +121,10 @@ impl FileUtils {
     pub async fn write_cached_state(&self, cached_state: &CachedState) -> Result<()> {
         let mut cache_file = self.get_central_cache_file().await?;
 
-        match toml::ser::to_vec(cached_state) {
+        match toml::ser::to_string(cached_state) {
             Ok(serialized_toml) => {
                 // write state to file
-                cache_file.write_all(&serialized_toml).await?;
+                cache_file.write_all(serialized_toml.as_bytes()).await?;
                 // cut off excess bytes from previous state of file
                 cache_file.set_len(serialized_toml.len() as u64).await?;
             }
@@ -227,9 +228,7 @@ pub fn get_project_directory() -> Result<directories::ProjectDirs> {
     Ok(project_directory)
 }
 
-pub async fn get_configuration_from_file(
-    configuration_file: &mut File,
-) -> std::result::Result<DaemonOptions, toml::de::Error> {
+pub async fn get_configuration_from_file(configuration_file: &mut File) -> Result<DaemonOptions> {
     // 8 KB
     const INITIAL_BUFFER_SIZE: usize = 8 * 1024;
 
@@ -243,8 +242,15 @@ pub async fn get_configuration_from_file(
         eprintln!("Failed to read from configuration file! {e}");
     }
 
-    let parsed_toml: toml::Value =
-        toml::from_slice(&configuration_buffer[..configuration_buffer.len()])?;
+    macro_rules! require {
+        ( $x:expr ) => {{
+            $x.map_err(|e| Error::new(ErrorKind::InvalidData, e))?
+        }};
+    }
+
+    let parsed_toml: toml::Value = require!(toml::from_str(require!(std::str::from_utf8(
+        &configuration_buffer
+    ))));
 
     let mut config = DaemonOptions::default();
 
@@ -253,7 +259,7 @@ pub async fn get_configuration_from_file(
             {
                 $(
                     if let Some(option) = parsed_toml.get(stringify!($x)) {
-                        config.$x = option.clone().try_into()?;
+                        config.$x = require!(option.clone().try_into());
                     }
                 )*
             }
@@ -272,10 +278,10 @@ pub async fn get_configuration_from_file(
         // we have to hardcode this case because otherwise, it will attempt to directly parse it
         // into a MonitorOverride rather than using the MonitorOverrideTOMLCompatible intermediate
         // it will not understand the internal tag field and will fail to parse
-        config.monitor_default_behavior = monitor_default_behavior
+        config.monitor_default_behavior = require!(monitor_default_behavior
             .clone()
-            .try_into::<MonitorOverrideTOMLCompatible>()?
-            .into();
+            .try_into::<MonitorOverrideTOMLCompatible>())
+        .into();
     }
 
     Ok(config)
