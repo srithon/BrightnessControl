@@ -124,7 +124,7 @@ impl FileUtils {
         match toml::ser::to_string(cached_state) {
             Ok(serialized_toml) => {
                 // write state to file
-                cache_file.write(&serialized_toml.as_bytes()).await?;
+                cache_file.write_all(serialized_toml.as_bytes()).await?;
                 // cut off excess bytes from previous state of file
                 cache_file.set_len(serialized_toml.len() as u64).await?;
             }
