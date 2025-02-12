@@ -379,6 +379,12 @@ impl Daemon {
                     .await
                     .get_monitor_override_indices(&monitor_override);
 
+                // return error if monitor_override_indices is empty
+                if monitor_override_indices.is_empty() {
+                    socket_holder.queue_error("No monitors found to toggle nightlight");
+                    return ProcessInputExitCode::Normal;
+                }
+
                 for &monitor_index in &monitor_override_indices {
                     let monitor_state_guard = self.monitor_states.read().await;
 
@@ -655,13 +661,39 @@ impl Daemon {
                 _ => unreachable!("Info should have been transformed!"),
             };
 
+            // return error if relevant_monitor_indices is empty
+            if relevant_monitor_indices.is_empty() {
+                socket_message_holder.queue_error("No monitors found to change brightness");
+                socket_message_holder.consume();
+                continue;
+            }
+
             // Printing out the starting brightness for all affected monitors
-            for &i in relevant_monitor_indices.iter() {
-                let f = monitor_states_guard.get_monitor_state_by_index(i).unwrap();
-                println!(
-                    "Original Brightness: {}",
-                    f.get_brightness_state().brightness.get()
-                );
+            {
+                let mut using_disconnected_monitor = false;
+
+                for &i in relevant_monitor_indices.iter() {
+                    let f = monitor_states_guard.get_monitor_state_by_index(i).unwrap();
+
+                    if !monitor_states_guard.is_monitor_index_enabled(i) {
+                        socket_message_holder.queue_error(format!(
+                            "Monitor {} is not connected",
+                            f.get_monitor_name()
+                        ));
+
+                        using_disconnected_monitor = true;
+                    }
+
+                    println!(
+                        "Original Brightness: {}",
+                        f.get_brightness_state().brightness.get()
+                    );
+                }
+
+                if using_disconnected_monitor {
+                    socket_message_holder.consume();
+                    continue;
+                }
             }
 
             // remove all irrelevant intermediate_brightness_states
