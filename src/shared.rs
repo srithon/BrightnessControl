@@ -108,3 +108,15 @@ pub enum ProgramInput {
     ReloadConfiguration,
     Shutdown,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ExitStatus {
+    Success,
+    Failure,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DaemonResponse {
+    pub exit_status: ExitStatus,
+    pub messages: Vec<String>,
+}

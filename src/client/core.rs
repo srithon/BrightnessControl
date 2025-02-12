@@ -1,11 +1,11 @@
 use bincode::Options as BincodeOptions;
 use clap::ArgMatches;
 
-use std::io::{Result, Write};
+use std::io::{Read, Result, Write};
 
 use std::os::unix::net::UnixStream;
 
-use std::io::{BufRead, BufReader};
+use std::io::BufReader;
 
 use crate::shared::*;
 
@@ -207,13 +207,29 @@ pub fn handle_input(matches: &clap::ArgMatches) -> Result<()> {
     socket.write_all(&binary_encoded_input)?;
 
     if !matches.is_present("quiet") {
-        // TODO figure out if a read timeout is necessary
-        let buffered_reader = BufReader::with_capacity(512, &mut socket);
-        for line in buffered_reader.lines() {
-            match line {
-                Ok(line) => println!("{line}"),
-                Err(e) => eprintln!("Failed to read line: {e}"),
-            };
+        // Read the entire response into a buffer
+        let mut response_buffer = Vec::new();
+        let mut reader = BufReader::new(&mut socket);
+        reader.read_to_end(&mut response_buffer)?;
+
+        // Deserialize the response
+        match BINCODE_OPTIONS.deserialize::<DaemonResponse>(&response_buffer) {
+            Ok(response) => {
+                // Print each message on its own line
+                for message in response.messages {
+                    println!("{}", message);
+                }
+
+                // Exit with appropriate status code
+                match response.exit_status {
+                    ExitStatus::Success => std::process::exit(0),
+                    ExitStatus::Failure => std::process::exit(1),
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to deserialize daemon response: {e}");
+                std::process::exit(1);
+            }
         }
     }
 
