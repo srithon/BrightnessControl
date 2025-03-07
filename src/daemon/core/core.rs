@@ -9,6 +9,7 @@ use tokio::{
     runtime::{self, Runtime},
     select,
     sync::{mpsc, RwLock},
+    task::JoinError,
     time, try_join,
 };
 
@@ -92,7 +93,17 @@ impl Daemon {
                     let daemon = self_arc.clone();
 
                     let shutdown_channel = tx.clone();
-                    tokio::spawn(async move {
+
+                    let local_set = tokio::task::LocalSet::new();
+                    fn local_run<T: 'static, U: Future<Output = T> + 'static>(
+                        local_set: &tokio::task::LocalSet,
+                        closure: U,
+                    ) -> impl Future<Output = std::result::Result<T, JoinError>> + use<'_, T, U>
+                    {
+                        local_set.run_until(async move { tokio::task::spawn_local(closure).await })
+                    }
+
+                    let result = local_run(&local_set, async move {
                         match stream {
                             Ok(mut stream) => {
                                 // Rust is amazing
@@ -142,7 +153,12 @@ impl Daemon {
                         }
 
                         std::io::Result::Ok(())
-                    });
+                    })
+                    .await?;
+
+                    if let Err(e) = result {
+                        eprintln!("Error processing input: {e}");
+                    }
                 }
 
                 Ok(())
@@ -579,10 +595,6 @@ impl Daemon {
             is_fading: &'a Cell<bool>,
             brightness_change_info: BrightnessChangeInfo,
         }
-
-        // ???
-        unsafe impl<'a> Send for MonitorInfo<'a> {}
-        unsafe impl<'a> Sync for MonitorInfo<'a> {}
 
         // use the read() and write() functions
         // this used to be on the inside of the loop so we would have to retake the lock every time
@@ -1227,7 +1239,7 @@ pub fn daemon(fork: bool) -> Result<()> {
         }
     }
 
-    let tokio_runtime = runtime::Builder::new_multi_thread()
+    let tokio_runtime = runtime::Builder::new_current_thread()
         .worker_threads(2)
         .max_blocking_threads(4)
         // WAS enable_io
