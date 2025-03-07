@@ -17,7 +17,7 @@ use tokio_stream::{wrappers::UnixListenerStream, StreamExt};
 
 use std::io::{Error, ErrorKind, Result};
 
-use std::cell::{Cell, UnsafeCell};
+use std::cell::Cell;
 use std::sync::Arc;
 
 use std::collections::{BTreeMap, VecDeque};
@@ -882,13 +882,10 @@ impl Daemon {
             // alternative: partition into fade and non-fade
             // used relevant_monitor_indices instead of intermediate_brightness_states for
             // partition because you cannot map after partition
-            let (to_fade_unsafe_cell, mut to_not_fade): (UnsafeCell<Vec<_>>, Vec<_>) = {
-                let (to_fade, to_not_fade): (Vec<_>, Vec<_>) = intermediate_brightness_states
+            let (to_fade, mut to_not_fade): (Vec<_>, Vec<_>) = {
+                intermediate_brightness_states
                     .iter_mut()
-                    .partition(|(_, monitor_info)| monitor_info.brightness_change_info.fade);
-
-                // UnsafeCell usage explained below; we need a mutable reference at one point
-                (UnsafeCell::new(to_fade), to_not_fade)
+                    .partition(|(_, monitor_info)| monitor_info.brightness_change_info.fade)
             };
 
             for (_, entry) in to_not_fade.iter_mut() {
@@ -941,12 +938,37 @@ impl Daemon {
                 }
             };
 
-            let to_fade = unsafe { to_fade_unsafe_cell.get().as_mut().unwrap() };
+            struct SplitMonitorInfo<'a> {
+                monitor_index: usize,
+                is_fading: &'a Cell<bool>,
+                brightness_change_info: &'a BrightnessChangeInfo,
+            }
 
-            if !to_fade.is_empty() {
+            let (to_fade_immutable, to_fade_mutexes, mut to_fade_brightnesses) = {
+                let (mut to_fade_immutable, mut to_fade_mutexes, mut to_fade_brightnesses): (
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                ) = Default::default();
+                for (i, monitor_info) in to_fade.into_iter() {
+                    to_fade_immutable.push(SplitMonitorInfo {
+                        monitor_index: *i,
+                        is_fading: monitor_info.is_fading,
+                        brightness_change_info: &monitor_info.brightness_change_info,
+                    });
+
+                    let (brightness, mutex_guard) = monitor_info.current_brightness.split();
+                    to_fade_brightnesses.push(brightness);
+                    to_fade_mutexes.push(mutex_guard);
+                }
+
+                (to_fade_immutable, to_fade_mutexes, to_fade_brightnesses)
+            };
+
+            if !to_fade_immutable.is_empty() {
                 macro_rules! set_fading_status {
                     ($status:expr) => {
-                        for (_, monitor_info) in to_fade.iter() {
+                        for monitor_info in to_fade_immutable.iter() {
                             monitor_info.is_fading.set($status)
                         }
                     };
@@ -965,7 +987,9 @@ impl Daemon {
 
                 macro_rules! fade_iterator {
                     () => {
-                        to_fade.iter().map(|(&i, _)| i)
+                        to_fade_immutable
+                            .iter()
+                            .map(|monitor_info| monitor_info.monitor_index)
                     };
                 }
 
@@ -985,11 +1009,10 @@ impl Daemon {
                 // FuturesUnordered because we only care if ONE OF the futures resolves
                 // the actual "order" of the futures is meaningless since that is just the order of the
                 // adapters
-                let mut receiver_futures = unsafe {
-                    let to_fade_alias = to_fade_unsafe_cell.get().as_mut().unwrap();
-                    to_fade_alias
-                        .iter_mut()
-                        .map(|(_, monitor_info)| monitor_info.current_brightness.mutex_guard.recv())
+                let mut receiver_futures = {
+                    to_fade_mutexes
+                        .into_iter()
+                        .map(|mutex_guard| mutex_guard.recv())
                         .collect::<FuturesUnordered<_>>()
                 };
 
@@ -1001,12 +1024,14 @@ impl Daemon {
 
                 for iter in 0..iterator_num_steps {
                     println!("Fade loop! {iter}");
-                    for (i, (_, monitor_info)) in to_fade.iter_mut().enumerate() {
-                        let brightness = monitor_info.current_brightness.get_mut();
-
+                    for (i, (split_monitor_info, brightness)) in to_fade_immutable
+                        .iter()
+                        .zip(to_fade_brightnesses.iter_mut())
+                        .enumerate()
+                    {
                         println!("Starting {i} brightness: {brightness}");
 
-                        *brightness += monitor_info.brightness_change_info.brightness_step;
+                        **brightness += split_monitor_info.brightness_change_info.brightness_step;
 
                         println!("{i} brightness: {brightness}");
                     }
@@ -1055,9 +1080,9 @@ impl Daemon {
                 // reset fading back to false
                 set_fading_status!(false);
 
-                for (&monitor_index, monitor_info) in to_fade {
+                for monitor_info in to_fade_immutable {
                     let monitor_name = monitor_states_guard
-                        .get_monitor_state_by_index(monitor_index)
+                        .get_monitor_state_by_index(monitor_info.monitor_index)
                         .unwrap()
                         .get_monitor_name();
                     socket_message_holder.queue_success(format!(

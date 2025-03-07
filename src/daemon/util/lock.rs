@@ -22,6 +22,10 @@ where
     pub fn get_mut(&mut self) -> &mut T {
         self.internal
     }
+
+    pub fn split<'b>(&'b mut self) -> (&'b mut T, &'b mut MutexGuard<'a, K>) {
+        (&mut self.internal, &mut self.mutex_guard)
+    }
 }
 
 // a version of RWLock that does not block readers from reading while a writer writes
