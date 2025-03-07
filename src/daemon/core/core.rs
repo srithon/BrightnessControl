@@ -17,6 +17,7 @@ use tokio_stream::{wrappers::UnixListenerStream, StreamExt};
 use std::io::{Error, ErrorKind, Result};
 
 use std::cell::{Cell, UnsafeCell};
+use std::sync::Arc;
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -52,18 +53,9 @@ struct Daemon {
     file_utils: FileUtils,
 }
 
-unsafe impl Send for Daemon {}
-unsafe impl Sync for Daemon {}
-
-struct DaemonWrapper {
-    daemon: UnsafeCell<Daemon>,
-}
-
-impl DaemonWrapper {
+impl Daemon {
     async fn run(self) -> Result<()> {
-        let daemon = unsafe { self.daemon.get().as_mut().unwrap() };
-
-        daemon.refresh_configuration().await?;
+        self.refresh_configuration().await?;
 
         register_sigterm_handler()?;
 
@@ -82,7 +74,7 @@ impl DaemonWrapper {
 
         println!(
             "{}",
-            daemon
+            self
                 .monitor_states
                 .get_formatted_display_states(Some(&MonitorOverride::All))
                 .await
@@ -91,12 +83,13 @@ impl DaemonWrapper {
         try_join!(
             async move {
                 let mut listener_stream = UnixListenerStream::new(listener);
-                let daemon_pointer = self.daemon.get();
+
+                let self_arc = Arc::new(self);
 
                 while let Some(stream) = listener_stream.next().await {
                     println!("Stream!");
 
-                    let daemon = unsafe { daemon_pointer.as_mut().unwrap() };
+                    let daemon = self_arc.clone();
 
                     let shutdown_channel = tx.clone();
                     tokio::spawn(async move {
@@ -351,7 +344,7 @@ impl Daemon {
         }
     }
 
-    async fn refresh_configuration(&mut self) -> Result<()> {
+    async fn refresh_configuration(&self) -> Result<()> {
         // don't need the early return flag here
         let _ = self.refresh_brightness_all().await?;
 
@@ -359,7 +352,7 @@ impl Daemon {
     }
 
     async fn process_input(
-        &mut self,
+        &self,
         program_input: ProgramInput,
         mut socket_holder: SocketMessageHolder,
     ) -> ProcessInputExitCode {
@@ -1260,11 +1253,7 @@ pub fn daemon(fork: bool) -> Result<()> {
         .build()?;
 
     let daemon = tokio_runtime.block_on(Daemon::new(file_utils))?;
-    let daemon_wrapper = DaemonWrapper {
-        daemon: UnsafeCell::new(daemon),
-    };
-
-    daemon_wrapper.start(tokio_runtime);
+    daemon.start(tokio_runtime);
 
     Ok(())
 }
