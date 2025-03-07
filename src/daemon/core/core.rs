@@ -274,47 +274,29 @@ impl Daemon {
         let commands = self.create_xrandr_commands(monitors).await;
 
         if auto_remove_displays {
-            // use UnsafeCell to have 2 separate iterators
-            // 1 iterating over futures
-            // 1 iterating over indices
-            // futures require a mutable reference to the underlying vector
-            // therefore, the 2 iterators cannot coexist normally
-            let enumerated_futures = {
-                let enumerated_futures = commands
-                    .into_iter()
-                    .filter_map(|(index, mut command)| {
-                        if let Ok(call_handle) = command.spawn() {
-                            Some((index, call_handle))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<(usize, _)>>();
-
-                UnsafeCell::new(enumerated_futures)
-            };
-
-            let mut active_monitor_indices_iterator = {
-                let enumerated_futures = unsafe { enumerated_futures.get().as_mut().unwrap() };
-
-                enumerated_futures.iter().map(|(index, _)| *index).rev()
-            };
-
             // we use FuturesOrdered because we want the output to line up with
-            // active_monitor_indices_iterator
-            // so we can identify the indices of the displays which threw an error
-            let mut ordered_futures = {
-                let enumerated_futures = unsafe { enumerated_futures.get().as_mut().unwrap() };
+            // active_monitor_indices_iterator, so we can identify the indices of the displays
+            // which threw an error
+            let (active_monitor_indices, mut command_handles): (Vec<usize>, Vec<_>) = commands
+                .into_iter()
+                .filter_map(|(index, mut command)| {
+                    if let Ok(call_handle) = command.spawn() {
+                        Some((index, call_handle))
+                    } else {
+                        None
+                    }
+                })
+                .rev()
+                .unzip();
 
-                enumerated_futures
-                    .iter_mut()
-                    .map(|(_, future)| future.wait())
-                    .rev()
-                    .collect::<FuturesOrdered<_>>()
-            };
+            let mut ordered_futures = command_handles
+                .iter_mut()
+                .map(|handle| handle.wait())
+                .collect::<FuturesOrdered<_>>();
 
             let mut removed_display = false;
 
+            let mut active_monitor_indices_iterator = active_monitor_indices.into_iter();
             while let Some(exit_status) = ordered_futures.next().await {
                 // guaranteed to work
                 let index = active_monitor_indices_iterator.next().unwrap();
