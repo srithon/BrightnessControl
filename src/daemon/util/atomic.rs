@@ -7,10 +7,6 @@ pub trait Atomic {
     fn store(&self, val: Self::Underlying, ordering: Ordering);
 }
 
-pub trait AtomicNumber: Atomic {
-    fn fetch_add(&self, val: Self::Underlying, ordering: Ordering) -> Self::Underlying;
-}
-
 impl Atomic for AtomicBool {
     type Underlying = bool;
     
@@ -46,11 +42,5 @@ impl Atomic for AtomicF64 {
     
     fn store(&self, val: f64, ordering: Ordering) {
         self.inner.store(val.to_bits(), ordering);
-    }
-}
-
-impl AtomicNumber for AtomicF64 {
-    fn fetch_add(&self, val: f64, ordering: Ordering) -> f64 {
-        f64::from_bits(self.inner.fetch_add(val.to_bits(), ordering))
     }
 }

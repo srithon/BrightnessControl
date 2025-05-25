@@ -32,7 +32,7 @@ use crate::{
         config::{persistent::*, runtime::*},
         core::display::*,
         fs::*,
-        util::{atomic::{Atomic, AtomicNumber}, io::*},
+        util::{atomic::Atomic, io::*},
     },
     shared::*,
 };
@@ -1032,7 +1032,8 @@ impl Daemon {
 
                         println!("Starting {i} brightness: {starting_brightness}");
 
-                        let ending_brightness = brightness.fetch_add(split_monitor_info.brightness_change_info.brightness_step, Ordering::Relaxed);
+                        let ending_brightness = starting_brightness + split_monitor_info.brightness_change_info.brightness_step;
+                        brightness.store(ending_brightness, Ordering::Relaxed);
 
                         println!("{i} brightness: {ending_brightness}");
                     }
