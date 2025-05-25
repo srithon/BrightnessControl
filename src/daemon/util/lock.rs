@@ -1,62 +1,60 @@
+use std::sync::atomic::Ordering;
+
 use tokio::sync::{Mutex, MutexGuard};
 
-use std::cell::Cell;
+use super::atomic::Atomic;
 
-pub struct MutexGuardRefWrapper<'a, T: Copy, K> {
-    internal: &'a mut T,
+pub struct MutexGuardRefWrapper<'a, T: Atomic, K> {
+    internal: &'a T,
     pub mutex_guard: MutexGuard<'a, K>,
 }
 
 impl<'a, T, K> MutexGuardRefWrapper<'a, T, K>
 where
-    T: Copy,
+    T: Atomic,
 {
-    pub fn set(&mut self, new_value: T) {
-        *self.internal = new_value;
+    pub fn set(&mut self, new_value: T::Underlying) {
+        self.internal.store(new_value, Ordering::Relaxed);
     }
 
-    pub fn get(&self) -> T {
-        *self.internal
+    pub fn get(&self) -> T::Underlying {
+        self.internal.load(Ordering::Relaxed)
     }
 
-    pub fn get_mut(&mut self) -> &mut T {
-        self.internal
+    pub fn split(&mut self) -> (&T, &mut MutexGuard<'a, K>) {
+        (&self.internal, &mut self.mutex_guard)
     }
 }
 
 // a version of RWLock that does not block readers from reading while a writer writes
 // by providing them with a copy of the internal value
 // this is meant to be used with primitives which have cheap Copy implementations
-pub struct NonReadBlockingRWLock<T: Copy, K> {
-    internal: Cell<T>,
+pub struct NonReadBlockingRWLock<T: Atomic, K> {
+    internal: T,
     write_mutex: Mutex<K>,
 }
 
-unsafe impl<T, K> Send for NonReadBlockingRWLock<T, K> where T: Copy {}
-
-unsafe impl<T, K> Sync for NonReadBlockingRWLock<T, K> where T: Copy {}
-
 impl<T, K> NonReadBlockingRWLock<T, K>
 where
-    T: Copy,
+    T: Atomic,
 {
-    pub fn new(initial_value: T, mutex_value: K) -> NonReadBlockingRWLock<T, K> {
+    pub fn new(initial_value: T::Underlying, mutex_value: K) -> NonReadBlockingRWLock<T, K> {
         NonReadBlockingRWLock {
-            internal: Cell::new(initial_value),
+            internal: T::new(initial_value),
             write_mutex: Mutex::new(mutex_value),
         }
     }
 
-    pub fn get(&self) -> T {
-        self.internal.get()
+    pub fn get(&self) -> T::Underlying {
+        self.internal.load(Ordering::Relaxed)
     }
 
-    pub async fn set_value(&self, new_value: T) {
+    pub async fn set_value(&self, new_value: T::Underlying) {
         // acquire lock
         let guard = self.write_mutex.lock().await;
 
         // update value
-        self.internal.set(new_value);
+        self.internal.store(new_value, Ordering::Relaxed);
 
         // explicitly drop guard so that it is in scope while setting cell
         drop(guard);
@@ -69,7 +67,7 @@ where
             Some(MutexGuardRefWrapper {
                 // need to get a mutable reference to internal without making the
                 // function take a mutable reference
-                internal: unsafe { self.internal.as_ptr().as_mut().unwrap() },
+                internal: &self.internal,
                 mutex_guard: guard,
             })
         } else {
@@ -83,7 +81,7 @@ where
         MutexGuardRefWrapper {
             // need to get a mutable reference to internal without making the
             // function take a mutable reference
-            internal: unsafe { self.internal.as_ptr().as_mut().unwrap() },
+            internal: &self.internal,
             mutex_guard: guard,
         }
     }

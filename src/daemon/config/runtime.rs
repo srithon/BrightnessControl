@@ -1,4 +1,4 @@
-use super::super::util::{io::*, lock::*};
+use super::super::util::{io::*, lock::*, atomic::*};
 
 use super::super::super::shared::*;
 
@@ -9,9 +9,10 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use std::cell::Cell;
+use std::sync::atomic::AtomicBool;
 
 pub type BrightnessGuard<'a> =
-    MutexGuardRefWrapper<'a, f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>;
+    MutexGuardRefWrapper<'a, AtomicF64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>;
 
 #[derive(Serialize, Deserialize)]
 pub struct CachedState {
@@ -115,14 +116,11 @@ impl ForwardedBrightnessInput {
 
 pub struct BrightnessState {
     // receiver end of channel in mutex
-    pub brightness: NonReadBlockingRWLock<f64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>,
-    pub nightlight: NonReadBlockingRWLock<bool, ()>,
+    pub brightness: NonReadBlockingRWLock<AtomicF64, mpsc::UnboundedReceiver<ForwardedBrightnessInput>>,
+    pub nightlight: NonReadBlockingRWLock<AtomicBool, ()>,
     pub fade_notifier: mpsc::UnboundedSender<ForwardedBrightnessInput>,
     pub is_fading: Cell<bool>,
 }
-
-unsafe impl Send for BrightnessState {}
-unsafe impl Sync for BrightnessState {}
 
 impl BrightnessState {
     pub fn new(initial_brightness: f64, nightlight: bool) -> BrightnessState {

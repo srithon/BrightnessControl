@@ -9,14 +9,16 @@ use tokio::{
     runtime::{self, Runtime},
     select,
     sync::{mpsc, RwLock},
+    task::JoinError,
     time, try_join,
 };
 
 use tokio_stream::{wrappers::UnixListenerStream, StreamExt};
 
-use std::io::{Error, ErrorKind, Result};
+use std::{io::{Error, ErrorKind, Result}, sync::atomic::Ordering};
 
-use std::cell::{Cell, UnsafeCell};
+use std::cell::Cell;
+use std::sync::Arc;
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -30,7 +32,7 @@ use crate::{
         config::{persistent::*, runtime::*},
         core::display::*,
         fs::*,
-        util::io::*,
+        util::{atomic::Atomic, io::*},
     },
     shared::*,
 };
@@ -52,18 +54,9 @@ struct Daemon {
     file_utils: FileUtils,
 }
 
-unsafe impl Send for Daemon {}
-unsafe impl Sync for Daemon {}
-
-struct DaemonWrapper {
-    daemon: UnsafeCell<Daemon>,
-}
-
-impl DaemonWrapper {
+impl Daemon {
     async fn run(self) -> Result<()> {
-        let daemon = unsafe { self.daemon.get().as_mut().unwrap() };
-
-        daemon.refresh_configuration().await?;
+        self.refresh_configuration().await?;
 
         register_sigterm_handler()?;
 
@@ -82,7 +75,7 @@ impl DaemonWrapper {
 
         println!(
             "{}",
-            daemon
+            self
                 .monitor_states
                 .get_formatted_display_states(Some(&MonitorOverride::All))
                 .await
@@ -91,15 +84,26 @@ impl DaemonWrapper {
         try_join!(
             async move {
                 let mut listener_stream = UnixListenerStream::new(listener);
-                let daemon_pointer = self.daemon.get();
+
+                let self_arc = Arc::new(self);
 
                 while let Some(stream) = listener_stream.next().await {
                     println!("Stream!");
 
-                    let daemon = unsafe { daemon_pointer.as_mut().unwrap() };
+                    let daemon = self_arc.clone();
 
                     let shutdown_channel = tx.clone();
-                    tokio::spawn(async move {
+
+                    let local_set = tokio::task::LocalSet::new();
+                    fn local_run<T: 'static, U: Future<Output = T> + 'static>(
+                        local_set: &tokio::task::LocalSet,
+                        closure: U,
+                    ) -> impl Future<Output = std::result::Result<T, JoinError>> + use<'_, T, U>
+                    {
+                        local_set.run_until(async move { tokio::task::spawn_local(closure).await })
+                    }
+
+                    let result = local_run(&local_set, async move {
                         match stream {
                             Ok(mut stream) => {
                                 // Rust is amazing
@@ -149,7 +153,12 @@ impl DaemonWrapper {
                         }
 
                         std::io::Result::Ok(())
-                    });
+                    })
+                    .await?;
+
+                    if let Err(e) = result {
+                        eprintln!("Error processing input: {e}");
+                    }
                 }
 
                 Ok(())
@@ -281,47 +290,29 @@ impl Daemon {
         let commands = self.create_xrandr_commands(monitors).await;
 
         if auto_remove_displays {
-            // use UnsafeCell to have 2 separate iterators
-            // 1 iterating over futures
-            // 1 iterating over indices
-            // futures require a mutable reference to the underlying vector
-            // therefore, the 2 iterators cannot coexist normally
-            let enumerated_futures = {
-                let enumerated_futures = commands
-                    .into_iter()
-                    .filter_map(|(index, mut command)| {
-                        if let Ok(call_handle) = command.spawn() {
-                            Some((index, call_handle))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<(usize, _)>>();
-
-                UnsafeCell::new(enumerated_futures)
-            };
-
-            let mut active_monitor_indices_iterator = {
-                let enumerated_futures = unsafe { enumerated_futures.get().as_mut().unwrap() };
-
-                enumerated_futures.iter().map(|(index, _)| *index).rev()
-            };
-
             // we use FuturesOrdered because we want the output to line up with
-            // active_monitor_indices_iterator
-            // so we can identify the indices of the displays which threw an error
-            let mut ordered_futures = {
-                let enumerated_futures = unsafe { enumerated_futures.get().as_mut().unwrap() };
+            // active_monitor_indices_iterator, so we can identify the indices of the displays
+            // which threw an error
+            let (active_monitor_indices, mut command_handles): (Vec<usize>, Vec<_>) = commands
+                .into_iter()
+                .filter_map(|(index, mut command)| {
+                    if let Ok(call_handle) = command.spawn() {
+                        Some((index, call_handle))
+                    } else {
+                        None
+                    }
+                })
+                .rev()
+                .unzip();
 
-                enumerated_futures
-                    .iter_mut()
-                    .map(|(_, future)| future.wait())
-                    .rev()
-                    .collect::<FuturesOrdered<_>>()
-            };
+            let mut ordered_futures = command_handles
+                .iter_mut()
+                .map(|handle| handle.wait())
+                .collect::<FuturesOrdered<_>>();
 
             let mut removed_display = false;
 
+            let mut active_monitor_indices_iterator = active_monitor_indices.into_iter();
             while let Some(exit_status) = ordered_futures.next().await {
                 // guaranteed to work
                 let index = active_monitor_indices_iterator.next().unwrap();
@@ -351,7 +342,7 @@ impl Daemon {
         }
     }
 
-    async fn refresh_configuration(&mut self) -> Result<()> {
+    async fn refresh_configuration(&self) -> Result<()> {
         // don't need the early return flag here
         let _ = self.refresh_brightness_all().await?;
 
@@ -359,7 +350,7 @@ impl Daemon {
     }
 
     async fn process_input(
-        &mut self,
+        &self,
         program_input: ProgramInput,
         mut socket_holder: SocketMessageHolder,
     ) -> ProcessInputExitCode {
@@ -604,10 +595,6 @@ impl Daemon {
             is_fading: &'a Cell<bool>,
             brightness_change_info: BrightnessChangeInfo,
         }
-
-        // ???
-        unsafe impl<'a> Send for MonitorInfo<'a> {}
-        unsafe impl<'a> Sync for MonitorInfo<'a> {}
 
         // use the read() and write() functions
         // this used to be on the inside of the loop so we would have to retake the lock every time
@@ -895,18 +882,14 @@ impl Daemon {
             // alternative: partition into fade and non-fade
             // used relevant_monitor_indices instead of intermediate_brightness_states for
             // partition because you cannot map after partition
-            let (to_fade_unsafe_cell, mut to_not_fade): (UnsafeCell<Vec<_>>, Vec<_>) = {
-                let (to_fade, to_not_fade): (Vec<_>, Vec<_>) = intermediate_brightness_states
+            let (to_fade, mut to_not_fade): (Vec<_>, Vec<_>) = {
+                intermediate_brightness_states
                     .iter_mut()
-                    .partition(|(_, monitor_info)| monitor_info.brightness_change_info.fade);
-
-                // UnsafeCell usage explained below; we need a mutable reference at one point
-                (UnsafeCell::new(to_fade), to_not_fade)
+                    .partition(|(_, monitor_info)| monitor_info.brightness_change_info.fade)
             };
 
             for (_, entry) in to_not_fade.iter_mut() {
-                let current = entry.current_brightness.get_mut();
-                *current = entry.brightness_change_info.end_brightness;
+                entry.current_brightness.set(entry.brightness_change_info.end_brightness);
                 // TODO
                 // actually probably don't want to remove this here
                 // you should wait till the other monitors are done fading
@@ -954,12 +937,37 @@ impl Daemon {
                 }
             };
 
-            let to_fade = unsafe { to_fade_unsafe_cell.get().as_mut().unwrap() };
+            struct SplitMonitorInfo<'a> {
+                monitor_index: usize,
+                is_fading: &'a Cell<bool>,
+                brightness_change_info: &'a BrightnessChangeInfo,
+            }
 
-            if !to_fade.is_empty() {
+            let (to_fade_immutable, to_fade_mutexes, mut to_fade_brightnesses) = {
+                let (mut to_fade_immutable, mut to_fade_mutexes, mut to_fade_brightnesses): (
+                    Vec<_>,
+                    Vec<_>,
+                    Vec<_>,
+                ) = Default::default();
+                for (i, monitor_info) in to_fade.into_iter() {
+                    to_fade_immutable.push(SplitMonitorInfo {
+                        monitor_index: *i,
+                        is_fading: monitor_info.is_fading,
+                        brightness_change_info: &monitor_info.brightness_change_info,
+                    });
+
+                    let (brightness, mutex_guard) = monitor_info.current_brightness.split();
+                    to_fade_brightnesses.push(brightness);
+                    to_fade_mutexes.push(mutex_guard);
+                }
+
+                (to_fade_immutable, to_fade_mutexes, to_fade_brightnesses)
+            };
+
+            if !to_fade_immutable.is_empty() {
                 macro_rules! set_fading_status {
                     ($status:expr) => {
-                        for (_, monitor_info) in to_fade.iter() {
+                        for monitor_info in to_fade_immutable.iter() {
                             monitor_info.is_fading.set($status)
                         }
                     };
@@ -978,7 +986,9 @@ impl Daemon {
 
                 macro_rules! fade_iterator {
                     () => {
-                        to_fade.iter().map(|(&i, _)| i)
+                        to_fade_immutable
+                            .iter()
+                            .map(|monitor_info| monitor_info.monitor_index)
                     };
                 }
 
@@ -998,11 +1008,10 @@ impl Daemon {
                 // FuturesUnordered because we only care if ONE OF the futures resolves
                 // the actual "order" of the futures is meaningless since that is just the order of the
                 // adapters
-                let mut receiver_futures = unsafe {
-                    let to_fade_alias = to_fade_unsafe_cell.get().as_mut().unwrap();
-                    to_fade_alias
-                        .iter_mut()
-                        .map(|(_, monitor_info)| monitor_info.current_brightness.mutex_guard.recv())
+                let mut receiver_futures = {
+                    to_fade_mutexes
+                        .into_iter()
+                        .map(|mutex_guard| mutex_guard.recv())
                         .collect::<FuturesUnordered<_>>()
                 };
 
@@ -1014,14 +1023,19 @@ impl Daemon {
 
                 for iter in 0..iterator_num_steps {
                     println!("Fade loop! {iter}");
-                    for (i, (_, monitor_info)) in to_fade.iter_mut().enumerate() {
-                        let brightness = monitor_info.current_brightness.get_mut();
+                    for (i, (split_monitor_info, brightness)) in to_fade_immutable
+                        .iter()
+                        .zip(to_fade_brightnesses.iter_mut())
+                        .enumerate()
+                    {
+                        let starting_brightness = brightness.load(Ordering::Relaxed);
 
-                        println!("Starting {i} brightness: {brightness}");
+                        println!("Starting {i} brightness: {starting_brightness}");
 
-                        *brightness += monitor_info.brightness_change_info.brightness_step;
+                        let ending_brightness = starting_brightness + split_monitor_info.brightness_change_info.brightness_step;
+                        brightness.store(ending_brightness, Ordering::Relaxed);
 
-                        println!("{i} brightness: {brightness}");
+                        println!("{i} brightness: {ending_brightness}");
                     }
 
                     // do not autoremove displays because we do not want to slow it down
@@ -1068,9 +1082,9 @@ impl Daemon {
                 // reset fading back to false
                 set_fading_status!(false);
 
-                for (&monitor_index, monitor_info) in to_fade {
+                for monitor_info in to_fade_immutable {
                     let monitor_name = monitor_states_guard
-                        .get_monitor_state_by_index(monitor_index)
+                        .get_monitor_state_by_index(monitor_info.monitor_index)
                         .unwrap()
                         .get_monitor_name();
                     socket_message_holder.queue_success(format!(
@@ -1252,7 +1266,7 @@ pub fn daemon(fork: bool) -> Result<()> {
         }
     }
 
-    let tokio_runtime = runtime::Builder::new_multi_thread()
+    let tokio_runtime = runtime::Builder::new_current_thread()
         .worker_threads(2)
         .max_blocking_threads(4)
         // WAS enable_io
@@ -1260,11 +1274,7 @@ pub fn daemon(fork: bool) -> Result<()> {
         .build()?;
 
     let daemon = tokio_runtime.block_on(Daemon::new(file_utils))?;
-    let daemon_wrapper = DaemonWrapper {
-        daemon: UnsafeCell::new(daemon),
-    };
-
-    daemon_wrapper.start(tokio_runtime);
+    daemon.start(tokio_runtime);
 
     Ok(())
 }
