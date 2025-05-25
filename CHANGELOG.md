@@ -1,3 +1,9 @@
+# 2.3.0
+- refactor: remove all `unsafe` usage in code
+
+# 2.2.0
+- properly return exit codes from daemon
+
 # 2.1.2
 - update project dependencies
 
