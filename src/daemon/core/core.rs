@@ -15,7 +15,7 @@ use tokio::{
 
 use tokio_stream::{wrappers::UnixListenerStream, StreamExt};
 
-use std::io::{Error, ErrorKind, Result};
+use std::{io::{Error, ErrorKind, Result}, sync::atomic::Ordering};
 
 use std::cell::Cell;
 use std::sync::Arc;
@@ -32,7 +32,7 @@ use crate::{
         config::{persistent::*, runtime::*},
         core::display::*,
         fs::*,
-        util::io::*,
+        util::{atomic::{Atomic, AtomicNumber}, io::*},
     },
     shared::*,
 };
@@ -889,8 +889,7 @@ impl Daemon {
             };
 
             for (_, entry) in to_not_fade.iter_mut() {
-                let current = entry.current_brightness.get_mut();
-                *current = entry.brightness_change_info.end_brightness;
+                entry.current_brightness.set(entry.brightness_change_info.end_brightness);
                 // TODO
                 // actually probably don't want to remove this here
                 // you should wait till the other monitors are done fading
@@ -1029,11 +1028,13 @@ impl Daemon {
                         .zip(to_fade_brightnesses.iter_mut())
                         .enumerate()
                     {
-                        println!("Starting {i} brightness: {brightness}");
+                        let starting_brightness = brightness.load(Ordering::Relaxed);
 
-                        **brightness += split_monitor_info.brightness_change_info.brightness_step;
+                        println!("Starting {i} brightness: {starting_brightness}");
 
-                        println!("{i} brightness: {brightness}");
+                        let ending_brightness = brightness.fetch_add(split_monitor_info.brightness_change_info.brightness_step, Ordering::Relaxed);
+
+                        println!("{i} brightness: {ending_brightness}");
                     }
 
                     // do not autoremove displays because we do not want to slow it down
